@@ -89,17 +89,21 @@
 
 ---
 
-## Milestone 4 — Filter Chain + Scorer
+## Milestone 4 — Filter Chain + Scorer ✓
 
 **Goal:** Matcher and scorer working, independently tested.
 
-- [ ] `src/pipeline/matcher.py` — `ExcludeKeywordsFilter`, `PositiveKeywordsFilter`, `DeduplicationFilter`, `AlreadySeenFilter`
-- [ ] `src/pipeline/scorer.py` — rule-based scoring (title match, seniority, remote, recency)
-- [ ] Unit tests: each filter in isolation, full chain with synthetic data
+- [x] `src/pipeline/matcher.py` — `ExcludeKeywordsFilter`, `PositiveKeywordsFilter`, `DeduplicationFilter`, `AlreadySeenFilter`, `run_filter_chain()`
+- [x] `src/pipeline/scorer.py` — rule-based scoring (title match, seniority, easy apply, remote, recency decay)
+- [x] Unit tests: matcher (22 tests), scorer (18 tests) — 40 new, 167 total
 
 **Verification:**
-- Synthetic run: 10 candidates in, 3 after exclude, 2 after dedup, 1 after already_seen
-- Score range: 0–100 (no overflow)
+- [x] `ruff check src/ tests/` — passes
+- [x] `mypy src/` — passes (0 issues, 18 source files)
+- [x] `pytest tests/unit/` — 167 tests passed
+- [x] Synthetic run: 10 in → 3 excluded → 1 deduped → 1 already_seen → 5 surviving
+- [x] Score range: 0-100 (clamped, never overflows or goes negative)
+- [x] Each filter independently testable and composable
 
 ---
 
@@ -153,10 +157,10 @@ Search complete: 50 raw, 12 filtered, 12 new candidates written to DB.
 
 ---
 
-## Milestone 8 - Increase "match" capabilities
+## Milestone 8 - Improve Matcher and Scorer capabilities
 [TODO] 
 - current - user is collecting, analysing and categorizing jobs from current linkeding recommendations
-- [] Should create a list of constraints for job removal
+- [] Should create a list of constraints for job removal ( CLT + hibrido + junior + etc )
 
 ## Backlog (Post-MVP)
 
