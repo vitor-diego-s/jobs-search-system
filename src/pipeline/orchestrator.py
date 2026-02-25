@@ -89,6 +89,7 @@ async def run_search(
         filtered,
         settings.scoring,
         require_keywords=search_config.require_keywords or None,
+        scoring_keywords=search_config.scoring_keywords or None,
     )
 
     # Step 5: DB upsert

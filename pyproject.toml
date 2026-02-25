@@ -25,6 +25,7 @@ dev = [
     "pre-commit",
     "types-PyYAML",
 ]
+profile = ["pymupdf>=1.24.0", "anthropic>=0.40.0"]
 
 [tool.ruff]
 target-version = "py312"
@@ -46,6 +47,14 @@ disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
 module = "patchright.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pymupdf.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "anthropic.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

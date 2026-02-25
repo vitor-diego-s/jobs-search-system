@@ -45,6 +45,11 @@ class TestSearchConfig:
         assert sc.platform == "linkedin"
         assert sc.fetch_description is False
         assert sc.exclude_keywords == []
+        assert sc.scoring_keywords == []
+
+    def test_scoring_keywords_accepted(self) -> None:
+        sc = SearchConfig(keyword="Python", scoring_keywords=["Django", "FastAPI"])
+        assert sc.scoring_keywords == ["Django", "FastAPI"]
 
 
 class TestQuotaPlatformConfig:
@@ -155,3 +160,18 @@ class TestSettings:
         settings = Settings.from_yaml("config/settings.yaml")
         assert len(settings.searches) == 2
         assert settings.searches[0].keyword == "Senior Python Engineer"
+
+    def test_yaml_without_scoring_keywords_loads(self, tmp_path: Path) -> None:
+        """Existing YAML without scoring_keywords field still loads (backward compat)."""
+        yaml_content = dedent("""\
+            searches:
+              - keyword: "Python Engineer"
+                platform: linkedin
+                exclude_keywords:
+                  - Junior
+        """)
+        config_file = tmp_path / "settings.yaml"
+        config_file.write_text(yaml_content)
+
+        settings = Settings.from_yaml(config_file)
+        assert settings.searches[0].scoring_keywords == []

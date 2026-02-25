@@ -28,6 +28,7 @@ def score_candidate(
     candidate: JobCandidate,
     config: ScoringConfig,
     require_keywords: list[str] | None = None,
+    scoring_keywords: list[str] | None = None,
 ) -> ScoredCandidate:
     """Score a single candidate using rule-based bonuses.
 
@@ -35,16 +36,18 @@ def score_candidate(
         candidate: The job candidate to score.
         config: Scoring weights from settings.
         require_keywords: Optional keywords; each hit adds title_match_bonus.
+        scoring_keywords: Optional keywords for score boost only (no hard filter).
 
     Returns:
         ScoredCandidate wrapping the original candidate with a score 0-100.
     """
     score = 0.0
 
-    # Title keyword match bonus
-    if require_keywords:
+    # Title keyword match bonus (require_keywords + scoring_keywords)
+    all_keywords = list(require_keywords or []) + list(scoring_keywords or [])
+    if all_keywords:
         title_lower = candidate.title.lower()
-        for kw in require_keywords:
+        for kw in all_keywords:
             if kw.lower().strip() in title_lower:
                 score += config.title_match_bonus
 
@@ -75,9 +78,10 @@ def score_candidates(
     candidates: list[JobCandidate],
     config: ScoringConfig,
     require_keywords: list[str] | None = None,
+    scoring_keywords: list[str] | None = None,
 ) -> list[ScoredCandidate]:
     """Score a batch of candidates, returning ScoredCandidate list sorted by score desc."""
-    scored = [score_candidate(c, config, require_keywords) for c in candidates]
+    scored = [score_candidate(c, config, require_keywords, scoring_keywords) for c in candidates]
     scored.sort(key=lambda s: s.score, reverse=True)
     return scored
 

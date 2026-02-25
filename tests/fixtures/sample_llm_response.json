@@ -1,0 +1,25 @@
+{
+  "name": "Jane Doe",
+  "search_keywords": [
+    "Senior Python Engineer",
+    "Staff Backend Engineer",
+    "Senior Software Engineer Python"
+  ],
+  "seniority": "senior",
+  "scoring_keywords": [
+    "Python",
+    "FastAPI",
+    "Django",
+    "PostgreSQL",
+    "Kubernetes",
+    "AWS"
+  ],
+  "exclude_keywords": [
+    "Junior",
+    "PHP",
+    "Frontend"
+  ],
+  "years_of_experience": 8,
+  "preferred_workplace": ["remote"],
+  "preferred_geo_ids": []
+}

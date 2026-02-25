@@ -25,6 +25,7 @@ class SearchConfig(BaseModel):
     filters: SearchFilters = Field(default_factory=SearchFilters)
     exclude_keywords: list[str] = Field(default_factory=list)
     require_keywords: list[str] = Field(default_factory=list)
+    scoring_keywords: list[str] = Field(default_factory=list)
     fetch_description: bool = False
 
     @field_validator("keyword")

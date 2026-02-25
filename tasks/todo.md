@@ -175,16 +175,37 @@ Quota: BLOCKED on second invocation (2/2 searches today)
 
 ---
 
-## Milestone 8 - Improve Matcher and Scorer capabilities
-[TODO] 
-- current - user is collecting, analysing and categorizing jobs from current linkeding recommendations
-- [] Should review the list of constraints for job removal ( CLT + hibrido + junior + etc )
+## Milestone 8 — Dynamic Keywords Extraction ✓
+
+**Goal:** Extract profile from resume PDF via Claude API, generate settings.yaml.
+
+- [x] `src/profile/schema.py` — `ProfileData` Pydantic model with `from_yaml`/`to_yaml`
+- [x] `src/profile/extractor.py` — PDF text extraction via `pymupdf` (optional dep)
+- [x] `src/profile/llm_analyzer.py` — Claude API resume analysis → `ProfileData`
+- [x] `src/profile/generator.py` — `ProfileData` → `settings.yaml` generation
+- [x] `src/core/config.py` — added `scoring_keywords` to `SearchConfig`
+- [x] `src/pipeline/scorer.py` — wired `scoring_keywords` (score boost only, no hard filter)
+- [x] `src/pipeline/orchestrator.py` — pass `scoring_keywords` through pipeline
+- [x] `main.py` — subcommand CLI: `search` (default), `extract-profile`, `generate-config`
+- [x] `pyproject.toml` — optional deps `[profile]`, mypy overrides
+- [x] `config/profile.yaml.example` — documented example
+- [x] Unit tests: 32 new (226 total)
+
+**Verification:**
+- [x] `ruff check src/ tests/ main.py` — passes
+- [x] `mypy src/ main.py` — passes (0 issues, 26 source files)
+- [x] `pytest tests/ -v` — 226 tests passed (194 existing + 32 new)
+- [x] Backward compat: `python main.py --dry-run` still works (no subcommand = search)
+- [x] Roundtrip: `ProfileData` → `generate_settings_dict` → `Settings.model_validate` succeeds
+- [x] Scorer: `scoring_keywords` + `require_keywords` accumulate title_match_bonus
+
+---
 
 ## Backlog (Post-MVP)
 
-- [ ] Glassdoor adapter (M8)
 - [ ] Description fetching (opt-in, +2-3s per job) (M9)
 - [ ] LLM-assisted relevance scoring (M10) — deferred from OQ-2
 - [ ] Email/notification when N new candidates found (M11)
 - [ ] Web UI for reviewing candidates (M12)
 - [ ] Export to Notion or Airtable (M13)
+- [ ] Glassdoor adapter (M14)

@@ -196,3 +196,39 @@ class TestScoreCandidates:
         scored = score_candidates(candidates, config, require_keywords=["Python"])
         for s in scored:
             assert 0.0 <= s.score <= 100.0
+
+
+# ---------------------------------------------------------------------------
+# Scoring keywords
+# ---------------------------------------------------------------------------
+
+
+class TestScoringKeywords:
+    def test_scoring_keywords_add_title_bonus(self) -> None:
+        config = _config(title_match_bonus=20.0, seniority_match_bonus=0.0)
+        result = score_candidate(
+            _candidate(title="Python Developer"),
+            config,
+            scoring_keywords=["Python"],
+        )
+        assert result.score >= 20.0
+
+    def test_scoring_and_require_accumulate(self) -> None:
+        config = _config(title_match_bonus=20.0, seniority_match_bonus=0.0)
+        result = score_candidate(
+            _candidate(title="Python Backend Developer"),
+            config,
+            require_keywords=["Python"],
+            scoring_keywords=["Backend"],
+        )
+        assert result.score >= 40.0
+
+    def test_none_scoring_keywords_backward_compat(self) -> None:
+        config = _config(title_match_bonus=20.0, seniority_match_bonus=0.0)
+        result = score_candidate(
+            _candidate(title="Python Developer"),
+            config,
+            require_keywords=["Python"],
+            scoring_keywords=None,
+        )
+        assert result.score >= 20.0

@@ -17,27 +17,86 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Jobs search engine - search multiple platforms and store candidates",
     )
-    parser.add_argument(
+    subparsers = parser.add_subparsers(dest="command")
+
+    # --- search subcommand (default) ---
+    search_parser = subparsers.add_parser("search", help="Run job searches")
+    search_parser.add_argument(
         "--config",
         default="config/settings.yaml",
         help="Path to settings YAML file (default: config/settings.yaml)",
     )
-    parser.add_argument(
+    search_parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Show what would be done without launching a browser",
     )
-    parser.add_argument(
+    search_parser.add_argument(
         "--export",
         choices=["json"],
         help="Export results to format (json)",
     )
-    parser.add_argument(
+    search_parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Enable verbose (DEBUG) logging",
     )
-    return parser.parse_args(argv)
+
+    # --- extract-profile subcommand ---
+    extract_parser = subparsers.add_parser(
+        "extract-profile",
+        help="Extract profile data from a resume PDF using Claude API",
+    )
+    extract_parser.add_argument(
+        "--resume",
+        required=True,
+        help="Path to resume PDF file",
+    )
+    extract_parser.add_argument(
+        "--output",
+        default="config/profile.yaml",
+        help="Output path for profile YAML (default: config/profile.yaml)",
+    )
+    extract_parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Enable verbose (DEBUG) logging",
+    )
+
+    # --- generate-config subcommand ---
+    generate_parser = subparsers.add_parser(
+        "generate-config",
+        help="Generate settings.yaml from a profile.yaml",
+    )
+    generate_parser.add_argument(
+        "--profile",
+        default="config/profile.yaml",
+        help="Path to profile YAML (default: config/profile.yaml)",
+    )
+    generate_parser.add_argument(
+        "--output",
+        default="config/settings.yaml",
+        help="Output path for settings YAML (default: config/settings.yaml)",
+    )
+    generate_parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Enable verbose (DEBUG) logging",
+    )
+
+    # --- backward compat: top-level flags for search ---
+    parser.add_argument("--config", default="config/settings.yaml", help=argparse.SUPPRESS)
+    parser.add_argument("--dry-run", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--export", choices=["json"], help=argparse.SUPPRESS)
+    parser.add_argument("--verbose", "-v", action="store_true", help=argparse.SUPPRESS)
+
+    args = parser.parse_args(argv)
+
+    # Default to search when no subcommand given
+    if args.command is None:
+        args.command = "search"
+
+    return args
 
 
 def setup_logging(verbose: bool) -> None:
@@ -100,20 +159,69 @@ async def run(settings: Settings, export_format: str | None) -> None:
     conn.close()
 
 
+def cmd_extract_profile(args: argparse.Namespace) -> None:
+    """Handle extract-profile subcommand."""
+    from src.profile.extractor import extract_text_from_pdf
+    from src.profile.llm_analyzer import analyze_resume
+
+    print(f"Extracting text from {args.resume}...")
+    text = extract_text_from_pdf(args.resume)
+    print(f"Extracted {len(text)} characters from PDF.")
+
+    print("Analyzing resume with Claude API...")
+    profile = analyze_resume(text)
+    profile.to_yaml(args.output)
+    print(f"Profile written to {args.output}")
+    print(f"  Name: {profile.name}")
+    print(f"  Seniority: {profile.seniority}")
+    print(f"  Search keywords: {profile.search_keywords}")
+    print(f"  Scoring keywords: {profile.scoring_keywords}")
+    print("Review the profile and then run: python main.py generate-config")
+
+
+def cmd_generate_config(args: argparse.Namespace) -> None:
+    """Handle generate-config subcommand."""
+    from src.profile.generator import generate_settings_dict, write_settings_yaml
+    from src.profile.schema import ProfileData
+
+    print(f"Loading profile from {args.profile}...")
+    profile = ProfileData.from_yaml(args.profile)
+
+    settings_dict = generate_settings_dict(profile)
+    write_settings_yaml(settings_dict, args.output)
+    print(f"Settings written to {args.output}")
+    print(f"  {len(settings_dict['searches'])} search entries generated")
+    print("Review the settings and then run: python main.py search")
+
+
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     setup_logging(args.verbose)
 
-    try:
-        settings = Settings.from_yaml(args.config)
-    except (FileNotFoundError, ValueError) as e:
-        print(f"Error loading config: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    if args.dry_run:
-        dry_run(settings)
+    if args.command == "extract-profile":
+        try:
+            cmd_extract_profile(args)
+        except (FileNotFoundError, ImportError, ValueError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+    elif args.command == "generate-config":
+        try:
+            cmd_generate_config(args)
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
     else:
-        asyncio.run(run(settings, args.export))
+        # search (default)
+        try:
+            settings = Settings.from_yaml(args.config)
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error loading config: {e}", file=sys.stderr)
+            sys.exit(1)
+
+        if args.dry_run:
+            dry_run(settings)
+        else:
+            asyncio.run(run(settings, args.export))
 
 
 if __name__ == "__main__":

@@ -33,4 +33,8 @@ Thumbs.db
 
 # Project-specific
 data/*.db
+data/*.db-shm
+data/*.db-wal
 config/linkedin_cookies.json
+config/profile.yaml
+*.pdf
