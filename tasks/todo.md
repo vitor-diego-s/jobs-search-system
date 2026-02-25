@@ -6,33 +6,40 @@
 
 ---
 
-## Milestone 0 — Foundation (Current)
+## Milestone 0 — Foundation ✓
 
 - [x] Write PRD (`docs/PRD.md`)
 - [x] Write Architecture (`docs/ARCHITECTURE.md`)
 - [x] Write lessons-applied (`docs/lessons-applied.md`)
-- [ ] Answer open questions (OQ-1 through OQ-4 in PRD.md)
-  - OQ-3 (DB ownership) is blocking M1
-- [ ] Create `pyproject.toml` (Python 3.12, patchright, pydantic v2, pytest)
-- [ ] Initialize project structure (dirs, empty `__init__.py`)
-- [ ] Set up pre-commit hooks (ruff, mypy)
+- [x] Answer open questions (OQ-1 through OQ-4 in PRD.md)
+  - OQ-1: Defer platform choice until LinkedIn is stable
+  - OQ-2: Rule-based scoring first; LLM scoring in backlog
+  - OQ-3: Shared DB between search and apply projects
+  - OQ-4: Per-search config (`fetch_description: true`)
+- [x] Create `pyproject.toml` (Python 3.12, patchright, pydantic v2, pytest)
+- [x] Initialize project structure (dirs, empty `__init__.py`)
+- [x] Set up pre-commit hooks (ruff, mypy)
+- [x] Create `.gitignore`
 
 ---
 
-## Milestone 1 — Core Schemas and DB
+## Milestone 1 — Core Schemas and DB ✓
 
 **Goal:** Importable models and working DB layer with tests.
 
-- [ ] `src/core/schemas.py` — `JobCandidate`, `ScoredCandidate`, `SearchRunResult`
-- [ ] `src/core/config.py` — `Settings`, `SearchConfig`, `QuotasConfig` (Pydantic v2)
-- [ ] `src/core/db.py` — SQLite init, `candidates`, `quota`, `search_runs` tables
-- [ ] `config/settings.yaml` — example configuration (LinkedIn remote Python search)
-- [ ] Unit tests: schemas validation, config loading, DB upsert + dedup
+- [x] `src/core/schemas.py` — `JobCandidate`, `ScoredCandidate`, `SearchRunResult`
+- [x] `src/core/config.py` — `Settings`, `SearchConfig`, `QuotasConfig` (Pydantic v2)
+- [x] `src/core/db.py` — SQLite init, `candidates`, `quota`, `search_runs` tables
+- [x] `config/settings.yaml` — example configuration (LinkedIn remote Python search)
+- [x] Unit tests: schemas validation, config loading, DB upsert + dedup
 
 **Verification:**
-- `pytest tests/unit/test_schemas.py` passes
-- `pytest tests/unit/test_db.py` passes
-- Inserting same `(external_id, platform)` twice → single row in DB
+- [x] `ruff check src/ tests/` — passes
+- [x] `mypy src/` — passes (0 issues, 9 source files)
+- [x] `pytest tests/unit/` — 47 tests passed
+- [x] Inserting same `(external_id, platform)` twice → single row in DB
+- [x] Config loading from YAML validates correctly
+- [x] Invalid config raises readable Pydantic errors
 
 ---
 
@@ -137,7 +144,7 @@ Search complete: 50 raw, 12 filtered, 12 new candidates written to DB.
 
 - [ ] Glassdoor adapter (M8)
 - [ ] Description fetching (opt-in, +2-3s per job) (M9)
-- [ ] Relevance scoring with LLM assist (M10)
+- [ ] LLM-assisted relevance scoring (M10) — deferred from OQ-2
 - [ ] Email/notification when N new candidates found (M11)
 - [ ] Web UI for reviewing candidates (M12)
 - [ ] Export to Notion or Airtable (M13)

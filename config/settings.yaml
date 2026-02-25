@@ -1,0 +1,47 @@
+database:
+  path: data/candidates.db
+
+quotas:
+  linkedin:
+    max_searches_per_day: 2
+    max_candidates_per_day: 150
+
+browser:
+  cookies_path: config/linkedin_cookies.json
+  timeout_ms: 30000
+
+searches:
+  - keyword: "Senior Python Engineer"
+    platform: linkedin
+    filters:
+      geo_id: 92000000           # Worldwide
+      workplace_type: [remote]
+      experience_level: [senior, director]
+      easy_apply_only: true
+      max_pages: 3
+    exclude_keywords:
+      - Junior
+      - PHP
+      - Ruby
+      - Frontend
+      - "React Native"
+    require_keywords: []
+    fetch_description: false
+
+  - keyword: "Staff Backend Engineer Python"
+    platform: linkedin
+    filters:
+      geo_id: 92000000
+      workplace_type: [remote]
+      easy_apply_only: true
+      max_pages: 2
+    exclude_keywords:
+      - Junior
+      - Frontend
+
+scoring:
+  title_match_bonus: 20
+  seniority_match_bonus: 15
+  easy_apply_bonus: 10
+  remote_bonus: 10
+  recency_weight: 0.3

@@ -161,11 +161,11 @@ This project owns **only the search and match phases**: discovering jobs, scorin
 
 ---
 
-## 9. Open Questions
+## 9. Open Questions (Resolved)
 
-| # | Question | Owner | Due |
-|---|----------|-------|-----|
-| OQ-1 | Which platforms after LinkedIn? Glassdoor first? | User | Milestone 2 |
-| OQ-2 | Is relevance scoring rule-based or LLM-assisted? | Design | Milestone 1 |
-| OQ-3 | Should the DB be shared with the apply project, or separate + synced? | Design | Milestone 1 |
-| OQ-4 | Description fetching: opt-in per search config, or global setting? | Design | Milestone 2 |
+| # | Question | Decision |
+|---|----------|----------|
+| OQ-1 | Which platforms after LinkedIn? Glassdoor first? | **Defer** — decide after LinkedIn adapter is stable |
+| OQ-2 | Is relevance scoring rule-based or LLM-assisted? | **Rule-based first** — LLM scoring added to backlog |
+| OQ-3 | Should the DB be shared with the apply project, or separate + synced? | **Shared DB** — both search and apply projects use the same SQLite file |
+| OQ-4 | Description fetching: opt-in per search config, or global setting? | **Per-search config** — `fetch_description: true` per search entry |
