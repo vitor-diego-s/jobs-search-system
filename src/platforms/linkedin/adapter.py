@@ -1,11 +1,9 @@
-"""LinkedIn platform adapter — wires URL builder, parser, and browser page.
-
-Full browser integration (scroll, delays) comes in M3.
-"""
+"""LinkedIn platform adapter — wires URL builder, parser, and browser page."""
 
 import logging
 from typing import Any
 
+from src.browser.actions import random_sleep, scroll_until_stable
 from src.core.config import SearchConfig
 from src.core.schemas import JobCandidate
 from src.platforms.base import PlatformAdapter
@@ -39,19 +37,24 @@ class LinkedInAdapter(PlatformAdapter):
             logger.info("Navigating to page %d: %s", page_num, url)
 
             await self._page.goto(url)
-            # TODO M3: await scroll_until_stable(self._page)
-            # TODO M3: await random_sleep(3, 7)
+            await scroll_until_stable(self._page, card_selectors=CARD_SELECTORS)
 
             cards = await self._find_cards()
             candidates = await parser.parse_cards(cards)
             all_candidates.extend(candidates)
 
-            logger.info("Page %d: found %d cards, parsed %d candidates",
-                        page_num, len(cards), len(candidates))
+            logger.info(
+                "Page %d: found %d cards, parsed %d candidates",
+                page_num, len(cards), len(candidates),
+            )
 
             if should_stop_pagination(len(cards), page_num):
                 logger.info("Stopping pagination: %d cards < 25", len(cards))
                 break
+
+            # Delay between pages (L7: 3-7s)
+            if page_num < config.filters.max_pages - 1:
+                await random_sleep(3.0, 7.0)
 
         return all_candidates
 

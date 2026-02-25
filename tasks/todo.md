@@ -68,17 +68,24 @@
 
 ---
 
-## Milestone 3 — Browser Session + Scroll
+## Milestone 3 — Browser Session + Scroll ✓
 
 **Goal:** Working browser session and scroll-until-stable action.
 
-- [ ] `src/browser/session.py` — patchright init, cookie loading
-- [ ] `src/browser/actions.py` — `scroll_until_stable()`, `random_sleep()` with floor enforcement
-- [ ] Integration test: mock page object → `scroll_until_stable()` terminates correctly
+- [x] `src/browser/session.py` — patchright init, cookie loading, headless=False hardcoded
+- [x] `src/browser/actions.py` — `scroll_until_stable()`, `random_sleep()` with floor enforcement
+- [x] `src/platforms/linkedin/adapter.py` — wired scroll + inter-page delays (replaced M3 TODOs)
+- [x] Unit tests: actions (14 tests), session/cookies (9 tests) — 23 new, 127 total
 
 **Verification:**
-- `random_sleep(min, max)` never sleeps less than `min`
-- `scroll_until_stable()` calls stop when card count stabilizes
+- [x] `ruff check src/ tests/` — passes
+- [x] `mypy src/` — passes (0 issues, 16 source files)
+- [x] `pytest tests/unit/` — 127 tests passed
+- [x] `random_sleep(min, max)` never sleeps less than `min` (floor enforcement)
+- [x] `scroll_until_stable()` stops when card count stabilizes (L6)
+- [x] Scroll delay floor 1.5s enforced regardless of caller args (L7)
+- [x] Inter-page delay 3-7s wired in adapter (L7)
+- [x] Cookie loading handles missing file, invalid JSON, non-array gracefully
 
 ---
 
@@ -145,6 +152,11 @@ Search complete: 50 raw, 12 filtered, 12 new candidates written to DB.
 ```
 
 ---
+
+## Milestone 8 - Increase "match" capabilities
+[TODO] 
+- current - user is collecting, analysing and categorizing jobs from current linkeding recommendations
+- [] Should create a list of constraints for job removal
 
 ## Backlog (Post-MVP)
 
