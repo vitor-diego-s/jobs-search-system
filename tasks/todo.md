@@ -147,21 +147,30 @@
 
 ---
 
-## Milestone 7 — Live Run + Validation
+## Milestone 7 — Live Run + Validation ✓
 
 **Goal:** Confirmed working against live LinkedIn.
 
-- [ ] Manual run with real cookies + 1 keyword
-- [ ] Verify: 25 cards parsed per page (not 14 — L6 fix)
-- [ ] Verify: company names populated (not empty — L12 fix)
-- [ ] Verify: no title `\n` duplicates (L5 fix)
-- [ ] Verify: quota enforced across 2 CLI invocations
+- [x] Cookie extraction script (`scripts/extract_cookies.py`)
+- [x] Manual run with real cookies + 2 keywords (5 pages total)
+- [x] Verify: 25 cards parsed per page (not 14 — L6 fix)
+- [x] Verify: company names populated — 0/90 empty (L12 fix + L16 occlusion fix)
+- [x] Verify: no title `\n` duplicates (L5 fix + L17 `<strong>` extraction)
+- [x] Verify: quota enforced across 2 CLI invocations (BLOCKED on 2nd dry-run)
+
+**Bugs found and fixed:**
+- [x] L16: Virtual DOM occlusion — cards outside viewport stripped to 16B empty shells. Fix: `scrollIntoView` + 150ms wait before parsing each card.
+- [x] L17: Title extraction — `<a>` text_content starts with `\n` + whitespace, L5 `split('\n')[0]` returned empty. Fix: use `<strong>` element text (priority 1), aria-label (priority 2), strip-then-split (priority 3).
 
 **Verification:**
 ```
-$ python main.py --config config/settings.yaml
-...
-Search complete: 50 raw, 12 filtered, 12 new candidates written to DB.
+$ python main.py -v
+Search complete: 125 raw, 90 filtered, 90 new candidates written to DB.
+  'Senior Python Engineer': 75 raw, 70 filtered, 70 new
+  'Staff Backend Engineer Python': 50 raw, 20 filtered, 20 new
+
+Empty titles: 0/90, Empty companies: 0/90, Titles with \n: 0
+Quota: BLOCKED on second invocation (2/2 searches today)
 ```
 
 ---

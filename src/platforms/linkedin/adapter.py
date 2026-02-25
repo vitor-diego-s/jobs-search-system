@@ -40,7 +40,7 @@ class LinkedInAdapter(PlatformAdapter):
             await scroll_until_stable(self._page, card_selectors=CARD_SELECTORS)
 
             cards = await self._find_cards()
-            candidates = await parser.parse_cards(cards)
+            candidates = await self._parse_with_scroll(parser, cards)
             all_candidates.extend(candidates)
 
             logger.info(
@@ -57,6 +57,27 @@ class LinkedInAdapter(PlatformAdapter):
                 await random_sleep(3.0, 7.0)
 
         return all_candidates
+
+    async def _parse_with_scroll(
+        self, parser: LinkedInParser, cards: list[Any],
+    ) -> list[JobCandidate]:
+        """Scroll each card into view before parsing to defeat occlusion.
+
+        LinkedIn strips inner HTML from off-screen cards (virtual DOM).
+        scrollIntoView restores the content so the parser can extract fields.
+        A brief wait after scrolling gives the browser time to render.
+        """
+        results: list[JobCandidate] = []
+        for card in cards:
+            try:
+                await card.scroll_into_view_if_needed()
+                await self._page.wait_for_timeout(150)
+                candidate = await parser.parse_card(card)
+                if candidate is not None:
+                    results.append(candidate)
+            except Exception:
+                logger.debug("Failed to scroll/parse card, skipping", exc_info=True)
+        return results
 
     async def _find_cards(self) -> list[Any]:
         """Find job cards using fallback selectors."""

@@ -264,6 +264,34 @@ These were broken in the previous project and must be fixed here:
 
 ---
 
+## L16. Virtual DOM Occlusion — scrollIntoView Before Parsing
+
+**Source:** M7 live validation (2026-02-25)
+**Root cause:** LinkedIn uses virtual DOM (`data-occludable-job-id`) — cards outside the viewport have their inner HTML stripped to ~16 bytes. The `<li>` shell remains with the `data-occludable-job-id` attribute, but `<a>`, `<span>`, company, title elements are removed.
+
+**Rules:**
+1. After `scroll_until_stable`, do NOT query all cards and parse in bulk — most cards will be empty shells.
+2. Before parsing each card, call `card.scroll_into_view_if_needed()` + brief wait (150ms) to restore content.
+3. `external_id` (an attribute on the `<li>`) survives occlusion; all inner elements do not.
+
+**Impact:** Without this fix, 100% of titles and 73% of companies were empty.
+
+---
+
+## L17. Title Extraction — Use `<strong>`, Not `<a>` text_content
+
+**Source:** M7 live validation (2026-02-25)
+**Root cause:** The `<a>` title link's `text_content()` returns `"\n                      Title\nTitle\n"` — leading newlines, whitespace, and aria-hidden duplication. The original L5 fix (`split('\n')[0]`) returned empty because the first segment before `\n` is whitespace.
+
+**Rules:**
+1. Prefer `<strong>` element inside the title link — always contains clean, single title text.
+2. Fallback to `aria-label` attribute (strip " with verification" suffix).
+3. Last resort: `text_content().strip().split('\n')[0].strip()` (strip first, then split).
+
+**Impact:** Without this fix, 100% of titles were empty strings.
+
+---
+
 ## L15. Lessons NOT Applied (Apply-Phase Only)
 
 The following lessons from the previous project are explicitly out of scope for this search-only system:

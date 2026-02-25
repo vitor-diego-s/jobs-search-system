@@ -66,7 +66,7 @@ class LinkedInParser:
             return None
 
         title_link = await self._find_first(card, TITLE_LINK_SELECTORS)
-        title = await self._parse_title(title_link)
+        title = await self._parse_title(card, title_link)
         url = await self._parse_url(title_link, external_id)
         company = await self._parse_text_fallback(card, COMPANY_SELECTORS)
         location = await self._parse_text_fallback(card, LOCATION_SELECTORS)
@@ -99,15 +99,41 @@ class LinkedInParser:
             logger.debug("Error extracting external_id", exc_info=True)
         return None
 
-    async def _parse_title(self, title_link: ElementLike | None) -> str:
-        """Extract title text, stripping \\n duplicates (L5)."""
+    async def _parse_title(
+        self, card: ElementLike, title_link: ElementLike | None,
+    ) -> str:
+        """Extract title text from <strong> inside title link, or aria-label.
+
+        LinkedIn wraps the clean title in <strong> inside the <a> link.
+        The <a>'s full text_content has leading \\n and duplicated text (L5),
+        so we prefer <strong> text or aria-label as reliable sources.
+        """
         try:
-            if title_link is None:
-                return ""
-            raw = await title_link.text_content()
-            if not raw:
-                return ""
-            return raw.split("\n")[0].strip()
+            # Priority 1: <strong> inside card (clean, no duplication)
+            strong = await card.query_selector("a span strong")
+            if strong is not None:
+                text = await strong.text_content()
+                if text and text.strip():
+                    return text.strip()
+
+            # Priority 2: aria-label on title link (may include "with verification")
+            if title_link is not None:
+                aria = await title_link.get_attribute("aria-label")
+                if aria and aria.strip():
+                    label = aria.strip()
+                    # Strip LinkedIn's "with verification" suffix
+                    suffix = " with verification"
+                    if label.endswith(suffix):
+                        label = label[: -len(suffix)]
+                    return label
+
+            # Priority 3: text_content with strip-then-split (fallback)
+            if title_link is not None:
+                raw = await title_link.text_content()
+                if raw:
+                    return raw.strip().split("\n")[0].strip()
+
+            return ""
         except Exception:
             logger.debug("Error parsing title", exc_info=True)
             return ""

@@ -18,12 +18,26 @@ def _make_mock_card(
     location: str = "Remote — Worldwide",
     posted_time: str | None = "2026-02-20",
     posted_text: str = "3 days ago",
+    aria_label: str | None = None,
+    has_strong: bool = True,
 ) -> AsyncMock:
     """Build a mock card element satisfying the ElementLike protocol."""
+    # Strong element (clean title, no duplication)
+    strong_el = AsyncMock()
+    strong_el.text_content.return_value = title
+
     # Title link element
     title_link = AsyncMock()
     title_link.text_content.return_value = title
-    title_link.get_attribute.return_value = href
+
+    async def _title_get_attr(name: str) -> str | None:
+        if name == "href":
+            return href
+        if name == "aria-label":
+            return aria_label
+        return None
+
+    title_link.get_attribute = AsyncMock(side_effect=_title_get_attr)
 
     # Company element
     company_el = AsyncMock()
@@ -47,6 +61,8 @@ def _make_mock_card(
     time_keywords = ("time", "listed-time", "footer-item")
 
     async def _query_selector(selector: str) -> AsyncMock | None:
+        if "strong" in selector and has_strong:
+            return strong_el
         if any(k in selector for k in title_keywords):
             return title_link
         if any(k in selector for k in company_keywords):
@@ -102,13 +118,68 @@ class TestLinkedInParserParseCard:
         assert result.location == "Remote — Worldwide"
         assert result.posted_time == "2026-02-20"
 
-    async def test_title_newline_stripped(self, parser: LinkedInParser) -> None:
-        """L5: title with \\n duplicate → only first line kept."""
-        card = _make_mock_card(title="Backend Developer\nBackend Developer")
+    async def test_title_from_strong_element(self, parser: LinkedInParser) -> None:
+        """Title extracted from <strong> element (clean, no duplication)."""
+        card = _make_mock_card(title="Backend Developer")
         result = await parser.parse_card(card)
         assert result is not None
         assert result.title == "Backend Developer"
         assert "\n" not in result.title
+
+    async def test_title_falls_back_to_aria_label(self, parser: LinkedInParser) -> None:
+        """When <strong> is missing, falls back to aria-label."""
+        card = _make_mock_card(
+            title="", has_strong=False, aria_label="Backend Developer",
+        )
+        result = await parser.parse_card(card)
+        assert result is not None
+        assert result.title == "Backend Developer"
+
+    async def test_title_aria_label_strips_verification(
+        self, parser: LinkedInParser,
+    ) -> None:
+        """aria-label 'Title with verification' → 'Title'."""
+        card = _make_mock_card(
+            title="", has_strong=False,
+            aria_label="Sr Software Engineer-AI with verification",
+        )
+        result = await parser.parse_card(card)
+        assert result is not None
+        assert result.title == "Sr Software Engineer-AI"
+
+    async def test_title_falls_back_to_text_content(
+        self, parser: LinkedInParser,
+    ) -> None:
+        """When both <strong> and aria-label missing, use text_content."""
+        card = _make_mock_card(has_strong=False, aria_label=None)
+        # Override title_link text_content to simulate real DOM
+        original = card.query_selector.side_effect
+
+        title_link = AsyncMock()
+        title_link.text_content.return_value = (
+            "\n                      Staff Engineer\nStaff Engineer\n"
+        )
+
+        async def _title_get_attr(name: str) -> str | None:
+            if name == "href":
+                return "/jobs/view/111111/"
+            return None
+
+        title_link.get_attribute = AsyncMock(side_effect=_title_get_attr)
+
+        title_kw = ("/jobs/view/", "job-card-list__title", "job-card-container__link")
+
+        async def _query_selector(selector: str) -> AsyncMock | None:
+            if "strong" in selector:
+                return None
+            if any(k in selector for k in title_kw):
+                return title_link
+            return await original(selector)
+
+        card.query_selector = AsyncMock(side_effect=_query_selector)
+        result = await parser.parse_card(card)
+        assert result is not None
+        assert result.title == "Staff Engineer"
 
     async def test_missing_company_returns_empty(self, parser: LinkedInParser) -> None:
         """L12: missing company → "" not crash."""
