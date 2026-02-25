@@ -107,16 +107,21 @@
 
 ---
 
-## Milestone 5 — Quota Manager
+## Milestone 5 — Quota Manager ✓
 
 **Goal:** Quota gate prevents over-searching, resets daily.
 
-- [ ] `src/pipeline/quota_manager.py` — `can_search()`, `record_search()`, `remaining_candidates()`
-- [ ] Unit tests: date rollover resets counters, gate blocks when limit reached
+- [x] `src/pipeline/quota_manager.py` — `can_search()`, `record_search()`, `remaining_candidates()`, `record_candidates()`
+- [x] Unit tests: 14 new tests, 181 total
 
 **Verification:**
-- Running 2 searches on the same day: 2nd succeeds, 3rd blocked
-- Day rollover: counters reset to 0
+- [x] `ruff check src/ tests/` — passes
+- [x] `mypy src/` — passes (0 issues, 19 source files)
+- [x] `pytest tests/unit/` — 181 tests passed
+- [x] 2 searches on same day: 2nd succeeds, 3rd blocked
+- [x] Day rollover: yesterday's quota does not affect today
+- [x] Platform isolation: linkedin quota doesn't affect glassdoor
+- [x] Unknown platform always allowed (no config = no limit)
 
 ---
 
@@ -160,7 +165,7 @@ Search complete: 50 raw, 12 filtered, 12 new candidates written to DB.
 ## Milestone 8 - Improve Matcher and Scorer capabilities
 [TODO] 
 - current - user is collecting, analysing and categorizing jobs from current linkeding recommendations
-- [] Should create a list of constraints for job removal ( CLT + hibrido + junior + etc )
+- [] Should review the list of constraints for job removal ( CLT + hibrido + junior + etc )
 
 ## Backlog (Post-MVP)
 
