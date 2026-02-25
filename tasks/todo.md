@@ -125,21 +125,25 @@
 
 ---
 
-## Milestone 6 — Orchestrator + CLI
+## Milestone 6 — Orchestrator + CLI ✓
 
 **Goal:** `python main.py` runs a search, writes to DB, prints summary.
 
-- [ ] `src/pipeline/orchestrator.py` — wires: quota → adapter → filter → score → DB write
-- [ ] `main.py` — CLI (argparse or click): `--config`, `--dry-run`, `--export json`
-- [ ] Integration test with mock adapter: full pipeline without browser
+- [x] `src/pipeline/orchestrator.py` — wires: quota → adapter → filter → score → DB write
+- [x] `main.py` — CLI (argparse): `--config`, `--dry-run`, `--export json`, `--verbose`
+- [x] Integration test with mock adapter: full pipeline without browser (10 tests)
 
-**Verification (dry-run):**
-```
-$ python main.py --config config/settings.yaml --dry-run
-[DRY RUN] 2 searches configured
-[DRY RUN] Quota check: OK (0/2 searches used today)
-[DRY RUN] Would write 0 candidates (no browser in dry-run)
-```
+**Verification:**
+- [x] `ruff check src/ tests/ main.py` — passes
+- [x] `mypy src/ main.py` — passes (0 issues, 21 source files)
+- [x] `pytest tests/ -v` — 191 tests passed (181 existing + 10 new)
+- [x] Pipeline data flow: quota gate → adapter.search → filter chain → score → DB upsert → record quota
+- [x] Dedup filter shared across keyword searches (cross-keyword deduplication)
+- [x] Quota blocks second search when limit=1
+- [x] Already-seen candidates filtered on rerun
+- [x] Scores sorted descending
+- [x] Candidates and search_runs persisted in DB
+- [x] JSON export format correct
 
 ---
 
