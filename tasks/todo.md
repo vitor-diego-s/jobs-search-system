@@ -43,22 +43,28 @@
 
 ---
 
-## Milestone 2 — LinkedIn Adapter (URL + Parser)
+## Milestone 2 — LinkedIn Adapter (URL + Parser) ✓
 
 **Goal:** URL builder and DOM parser fully tested with HTML fixtures.
 
-- [ ] `src/platforms/base.py` — `PlatformAdapter` abstract class
-- [ ] `src/platforms/linkedin/selectors.py` — selector constants with fallbacks
-- [ ] `src/platforms/linkedin/searcher.py` — URL builder + pagination logic
-- [ ] `src/platforms/linkedin/parser.py` — DOM → `JobCandidate` (with L5+L12 fixes)
-- [ ] `tests/fixtures/linkedin_results_page.html` — saved real page for parser tests
-- [ ] Unit tests: URL builder (all params), parser (title, company, id, url, dates)
+- [x] `src/platforms/base.py` — `PlatformAdapter` abstract class
+- [x] `src/platforms/linkedin/selectors.py` — selector constants with fallbacks
+- [x] `src/platforms/linkedin/searcher.py` — URL builder + pagination logic
+- [x] `src/platforms/linkedin/parser.py` — DOM → `JobCandidate` (with L5+L12 fixes)
+- [x] `src/platforms/linkedin/adapter.py` — skeleton adapter (M3 TODOs for scroll/sleep)
+- [x] `tests/fixtures/linkedin_results_page.html` — reference HTML fixture
+- [x] Unit tests: URL builder (38 tests), parser (18 tests) — 57 new, 104 total
 
 **Verification:**
-- Title never contains `\n`
-- `external_id` parsed from `data-job-id` (not URL)
-- Company field returns `""` (not crash) when selector misses
-- All URL params roundtrip correctly
+- [x] `ruff check src/ tests/` — passes
+- [x] `mypy src/` — passes (0 issues, 14 source files)
+- [x] `pytest tests/unit/` — 104 tests passed
+- [x] Title never contains `\n` (L5)
+- [x] `external_id` parsed from `data-occludable-job-id` attr (fallback `data-job-id`)
+- [x] Company field returns `""` (not crash) when selector misses (L12)
+- [x] `is_easy_apply` from config, not DOM (L2)
+- [x] All URL params roundtrip correctly
+- [x] Unknown filter values skipped with warning
 
 ---
 

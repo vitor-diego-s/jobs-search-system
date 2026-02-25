@@ -1,0 +1,47 @@
+<!--
+  Reference HTML fixture for LinkedIn parser tests.
+  Three cards exercising different selector paths:
+    1. Full data, primary selectors (data-occludable-job-id="111111")
+    2. Fallback selectors (data-job-id="222222", .artdeco-entity-lockup__subtitle)
+    3. Missing company + title with \n duplicate (L5/L12 test case)
+-->
+<ul class="jobs-search-results__list">
+
+  <!-- Card 1: Primary selectors, full data -->
+  <li data-occludable-job-id="111111" class="jobs-search-results__list-item">
+    <div class="job-card-container">
+      <a href="https://www.linkedin.com/jobs/view/111111/?trackingId=abc123" class="job-card-list__title">
+        Senior Python Engineer
+      </a>
+      <span class="job-card-container__primary-description">Acme Corp</span>
+      <li class="job-card-container__metadata-item">Remote — Worldwide</li>
+      <time datetime="2026-02-20">3 days ago</time>
+    </div>
+  </li>
+
+  <!-- Card 2: Fallback selectors -->
+  <li data-job-id="222222" class="scaffold-layout__list-item">
+    <div class="artdeco-entity-lockup">
+      <a href="/jobs/view/222222/?refId=xyz789">
+        Staff Backend Engineer
+      </a>
+      <div class="artdeco-entity-lockup__subtitle">TechStartup Inc</div>
+      <div class="artdeco-entity-lockup__caption">New York, NY</div>
+      <span class="job-card-container__listed-time">1 week ago</span>
+    </div>
+  </li>
+
+  <!-- Card 3: Missing company, title with \n duplicate (L5 + L12) -->
+  <li data-occludable-job-id="333333" class="jobs-search-results__list-item">
+    <div class="job-card-container">
+      <a href="https://www.linkedin.com/jobs/view/333333/">
+        Backend Developer
+        Backend Developer
+      </a>
+      <!-- No company element at all -->
+      <li class="job-card-container__metadata-item">San Francisco, CA</li>
+      <time datetime="2026-02-24">1 day ago</time>
+    </div>
+  </li>
+
+</ul>
