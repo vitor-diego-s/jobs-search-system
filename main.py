@@ -58,6 +58,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Output path for profile YAML (default: config/profile.yaml)",
     )
     extract_parser.add_argument(
+        "--provider",
+        default="anthropic",
+        choices=["anthropic", "openai", "gemini", "ollama"],
+        help="LLM provider for resume analysis (default: anthropic)",
+    )
+    extract_parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Enable verbose (DEBUG) logging",
@@ -168,8 +174,8 @@ def cmd_extract_profile(args: argparse.Namespace) -> None:
     text = extract_text_from_pdf(args.resume)
     print(f"Extracted {len(text)} characters from PDF.")
 
-    print("Analyzing resume with Claude API...")
-    profile = analyze_resume(text)
+    print(f"Analyzing resume with {args.provider} provider...")
+    profile = analyze_resume(text, provider=args.provider)
     profile.to_yaml(args.output)
     print(f"Profile written to {args.output}")
     print(f"  Name: {profile.name}")

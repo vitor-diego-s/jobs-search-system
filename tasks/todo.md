@@ -201,6 +201,33 @@ Quota: BLOCKED on second invocation (2/2 searches today)
 
 ---
 
+## Milestone 8b — LLM Provider Adapter Pattern ✓
+
+**Goal:** Adapter pattern for LLM providers so users can swap between Anthropic, OpenAI, Gemini, Ollama.
+
+- [x] `src/profile/llm/base.py` — `LLMProvider` ABC + shared `SYSTEM_PROMPT` and `parse_response`
+- [x] `src/profile/llm/anthropic.py` — `AnthropicProvider` (extracted from `llm_analyzer.py`)
+- [x] `src/profile/llm/openai.py` — `OpenAIProvider` (GPT-4o-mini default)
+- [x] `src/profile/llm/gemini.py` — `GeminiProvider` (Gemini 2.0 Flash default)
+- [x] `src/profile/llm/ollama.py` — `OllamaProvider` (local, OpenAI-compatible API)
+- [x] `src/profile/llm/__init__.py` — Provider registry with lazy loading
+- [x] `src/profile/llm_analyzer.py` — Refactored to thin facade (backward-compat preserved)
+- [x] `main.py` — Added `--provider` flag to `extract-profile` subcommand
+- [x] `pyproject.toml` — Granular optional deps (`[anthropic]`, `[openai]`, `[gemini]`, `[profile-all]`)
+- [x] `docs/PRD.md` — Section 10: LLM Provider Research (benchmarking table, cost estimates, guide)
+- [x] Unit tests: 22 new (248 total)
+
+**Verification:**
+- [x] `ruff check src/ tests/ main.py` — passes
+- [x] `mypy src/ main.py` — passes (0 issues, 32 source files)
+- [x] `pytest tests/ -v` — 248 tests passed (226 existing + 22 new)
+- [x] Backward compat: `analyze_resume("text")` defaults to Anthropic
+- [x] Backward compat: `_parse_response` re-exported (existing 8 tests pass unchanged)
+- [x] CLI: `--provider openai` accepted, `--provider nope` rejected
+- [x] Unknown provider: `get_provider("nope")` → clear ValueError
+
+---
+
 ## Backlog (Post-MVP)
 
 - [ ] Description fetching (opt-in, +2-3s per job) (M9)

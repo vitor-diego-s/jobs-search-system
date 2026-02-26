@@ -169,3 +169,47 @@ This project owns **only the search and match phases**: discovering jobs, scorin
 | OQ-2 | Is relevance scoring rule-based or LLM-assisted? | **Rule-based first** — LLM scoring added to backlog |
 | OQ-3 | Should the DB be shared with the apply project, or separate + synced? | **Shared DB** — both search and apply projects use the same SQLite file |
 | OQ-4 | Description fetching: opt-in per search config, or global setting? | **Per-search config** — `fetch_description: true` per search entry |
+
+---
+
+## 10. LLM Provider Research
+
+The `extract-profile` command uses an LLM to analyze resumes and extract structured data. This section benchmarks available providers to help users choose based on cost, accuracy, and privacy requirements.
+
+### 10.1 Provider Comparison
+
+| Provider | Cheapest Model | Input $/1M | Output $/1M | Structured Output | SDK | Status |
+|----------|---------------|-----------|------------|------------------|-----|--------|
+| Anthropic | Haiku 4.5 | $1.00 | $5.00 | Native | `anthropic` | **Implemented** |
+| OpenAI | GPT-4o-mini | $0.15 | $0.60 | Native JSON mode | `openai` | **Implemented** |
+| Google Gemini | 2.0 Flash | $0.10 | $0.40 | Yes | `google-generativeai` | **Implemented** |
+| Groq | Llama 3.1 8B | $0.06 | $0.06 | Limited | `groq` | Backlog |
+| Mistral | Nemo | $0.02 | $0.02 | JSON mode | `mistralai` | Backlog |
+| DeepSeek | V3.2-Exp | $0.028 | $0.056 | JSON mode | `openai` (compat) | Backlog |
+| Ollama | Llama 3 / Qwen | Free | Free | Via prompting | `openai` (compat) | **Implemented** |
+
+### 10.2 Cost-per-Resume Estimates
+
+A typical resume is 800-1200 tokens (input) and the structured JSON response is ~300-500 tokens (output).
+
+| Provider | Est. Cost per Resume | 100 Resumes |
+|----------|---------------------|-------------|
+| Anthropic (Haiku 4.5) | ~$0.003 | ~$0.35 |
+| OpenAI (GPT-4o-mini) | ~$0.0005 | ~$0.05 |
+| Gemini (2.0 Flash) | ~$0.0003 | ~$0.03 |
+| Ollama (local) | $0.00 | $0.00 |
+
+### 10.3 Recommendation
+
+- **Default (Anthropic):** Best extraction accuracy for complex resumes, reliable JSON output
+- **Budget (OpenAI GPT-4o-mini):** Excellent cost/quality ratio, native JSON mode reduces parse errors
+- **Cheapest cloud (Gemini 2.0 Flash):** Lowest cost per resume, good for batch processing
+- **Privacy (Ollama):** Zero cost, fully local, no data leaves your machine. Requires local GPU for acceptable speed
+
+### 10.4 Adding a New Provider
+
+1. Create `src/profile/llm/<provider>.py` implementing `LLMProvider` ABC
+2. Implement `provider_id`, `default_model`, `env_var`, and `complete()` methods
+3. Register in `src/profile/llm/__init__.py` `_REGISTRY` dict
+4. Add the provider name to `--provider` choices in `main.py`
+5. Add SDK to optional deps in `pyproject.toml` and mypy overrides if needed
