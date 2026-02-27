@@ -171,6 +171,7 @@ def export_results_json(results: list[SearchResult]) -> str:
                 "is_easy_apply": c.is_easy_apply,
                 "workplace_type": c.workplace_type,
                 "posted_time": c.posted_time,
+                "description_snippet": c.description_snippet,
                 "score": s.score,
             })
     return json.dumps(data, indent=2)

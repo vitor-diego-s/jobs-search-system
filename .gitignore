@@ -31,6 +31,12 @@ env/
 .DS_Store
 Thumbs.db
 
+# Environment
+.env
+
+# Temp scripts
+scripts/
+
 # Project-specific
 data/*.db
 data/*.db-shm

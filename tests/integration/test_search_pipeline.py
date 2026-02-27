@@ -237,6 +237,39 @@ class TestFullPipeline:
         assert row["cnt"] == 1
 
 
+    async def test_description_snippet_persisted(self, db: sqlite3.Connection) -> None:
+        """Candidates with description_snippet survive pipeline and persist to DB."""
+        candidates = [
+            JobCandidate(
+                external_id="desc1",
+                platform="linkedin",
+                title="Senior Python Engineer",
+                company="Acme",
+                url="https://www.linkedin.com/jobs/view/desc1/",
+                is_easy_apply=True,
+                workplace_type="remote",
+                posted_time="1 day ago",
+                description_snippet="We are looking for a senior Python engineer to join our team.",
+            ),
+        ]
+        adapter = MockAdapter(candidates)
+        settings = _settings()
+
+        results = await run_all_searches(settings, adapter, db)
+
+        assert len(results) == 1
+        assert results[0].new_count == 1
+        # Verify persisted in DB
+        row = db.execute(
+            "SELECT description_snippet FROM candidates WHERE external_id = ?",
+            ("desc1",),
+        ).fetchone()
+        assert row is not None
+        assert row["description_snippet"] == (
+            "We are looking for a senior Python engineer to join our team."
+        )
+
+
 class TestExportJson:
     def test_export_format(self) -> None:
         from src.core.schemas import ScoredCandidate
@@ -256,6 +289,30 @@ class TestExportJson:
         assert data[0]["score"] == 42.5
         assert data[0]["keyword"] == "test"
         assert data[0]["external_id"] == "1"
+        assert "description_snippet" in data[0]
+
+    def test_export_includes_description_snippet(self) -> None:
+        from src.core.schemas import ScoredCandidate
+
+        candidate = JobCandidate(
+            external_id="99",
+            platform="linkedin",
+            title="Engineer",
+            url="https://www.linkedin.com/jobs/view/99/",
+            description_snippet="Full description text here.",
+        )
+        scored = [ScoredCandidate(candidate=candidate, score=50.0)]
+        result = SearchResult(
+            keyword="test",
+            platform="linkedin",
+            raw_count=1,
+            filtered_count=1,
+            new_count=1,
+            scored=scored,
+        )
+        output = export_results_json([result])
+        data = json.loads(output)
+        assert data[0]["description_snippet"] == "Full description text here."
 
     def test_export_empty(self) -> None:
         output = export_results_json([])

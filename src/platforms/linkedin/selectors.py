@@ -43,6 +43,15 @@ POSTED_TIME_SELECTORS: tuple[str, ...] = (
     ".job-card-container__footer-item",
 )
 
+# --- Description panel (side panel content after clicking a card) ---
+DESCRIPTION_PANEL_SELECTORS: tuple[str, ...] = (
+    "#job-details",
+    "div.jobs-description__content",
+    "div.jobs-description-content__text",
+    "article.jobs-description__container",
+    ".jobs-box__html-content",
+)
+
 # --- No results indicator ---
 NO_RESULTS_SELECTORS: tuple[str, ...] = (
     ".jobs-search-no-results-banner",

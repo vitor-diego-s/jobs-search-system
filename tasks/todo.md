@@ -228,10 +228,34 @@ Quota: BLOCKED on second invocation (2/2 searches today)
 
 ---
 
+## Milestone 9 — Description Fetching (Option A: Persist Full Text) ✓
+
+**Goal:** Populate `description_snippet` by extracting job descriptions from LinkedIn's side panel.
+
+- [x] `src/platforms/linkedin/selectors.py` — `DESCRIPTION_PANEL_SELECTORS` (5 fallback selectors)
+- [x] `src/platforms/linkedin/adapter.py` — `_fetch_description()` method (click → wait → extract → delay)
+- [x] `src/platforms/linkedin/adapter.py` — `_parse_with_scroll()` enriches candidates when `fetch_description=True`
+- [x] `src/platforms/linkedin/adapter.py` — `search()` passes `config.fetch_description` through
+- [x] `src/pipeline/orchestrator.py` — `export_results_json` includes `description_snippet`
+- [x] `tests/unit/test_description_fetch.py` — 7 unit tests (fetch, skip, timeout, error, delay, scroll+enrich, scroll+skip)
+- [x] `tests/integration/test_search_pipeline.py` — 2 new tests (DB persistence, JSON export)
+
+**Verification:**
+- [x] `ruff check src/ tests/ main.py` — passes
+- [x] `mypy src/ main.py` — passes (pre-existing M8 issues only)
+- [x] `pytest tests/ -v` — 257 tests passed (248 existing + 9 new)
+- [x] `fetch_description=False` (default) → zero extra DOM interactions, no regression
+- [x] `fetch_description=True` → card click → panel wait → text extraction → anti-detection delay
+- [x] Description text normalized (whitespace collapsed)
+- [x] Failure at any step → empty string, candidate preserved (L12)
+- [x] JSON export includes `description_snippet` field
+- [x] DB roundtrip: `description_snippet` persisted and queryable
+
+---
+
 ## Backlog (Post-MVP)
 
-- [ ] Description fetching (opt-in, +2-3s per job) (M9)
-- [ ] LLM-assisted relevance scoring (M10) — deferred from OQ-2
+- [ ] LLM-assisted relevance scoring (M10) — deferred from OQ-2 (M9 prerequisite done)
 - [ ] Email/notification when N new candidates found (M11)
 - [ ] Web UI for reviewing candidates (M12)
 - [ ] Export to Notion or Airtable (M13)

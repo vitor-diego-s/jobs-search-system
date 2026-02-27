@@ -9,7 +9,7 @@ from src.core.schemas import JobCandidate
 from src.platforms.base import PlatformAdapter
 from src.platforms.linkedin.parser import LinkedInParser
 from src.platforms.linkedin.searcher import build_url, should_stop_pagination
-from src.platforms.linkedin.selectors import CARD_SELECTORS
+from src.platforms.linkedin.selectors import CARD_SELECTORS, DESCRIPTION_PANEL_SELECTORS
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,9 @@ class LinkedInAdapter(PlatformAdapter):
             await scroll_until_stable(self._page, card_selectors=CARD_SELECTORS)
 
             cards = await self._find_cards()
-            candidates = await self._parse_with_scroll(parser, cards)
+            candidates = await self._parse_with_scroll(
+                parser, cards, fetch_description=config.fetch_description,
+            )
             all_candidates.extend(candidates)
 
             logger.info(
@@ -59,13 +61,20 @@ class LinkedInAdapter(PlatformAdapter):
         return all_candidates
 
     async def _parse_with_scroll(
-        self, parser: LinkedInParser, cards: list[Any],
+        self,
+        parser: LinkedInParser,
+        cards: list[Any],
+        *,
+        fetch_description: bool = False,
     ) -> list[JobCandidate]:
         """Scroll each card into view before parsing to defeat occlusion.
 
         LinkedIn strips inner HTML from off-screen cards (virtual DOM).
         scrollIntoView restores the content so the parser can extract fields.
         A brief wait after scrolling gives the browser time to render.
+
+        If fetch_description is True, clicks each card to open the side panel
+        and extracts the full job description text.
         """
         results: list[JobCandidate] = []
         for card in cards:
@@ -74,10 +83,41 @@ class LinkedInAdapter(PlatformAdapter):
                 await self._page.wait_for_timeout(150)
                 candidate = await parser.parse_card(card)
                 if candidate is not None:
+                    if fetch_description:
+                        desc = await self._fetch_description(card)
+                        if desc:
+                            candidate = candidate.model_copy(
+                                update={"description_snippet": desc},
+                            )
                     results.append(candidate)
             except Exception:
                 logger.debug("Failed to scroll/parse card, skipping", exc_info=True)
         return results
+
+    async def _fetch_description(self, card: Any) -> str:
+        """Click a card and extract the job description from the side panel.
+
+        Returns the full description text, or "" on any failure (L12).
+        Adds a random delay after extraction for anti-detection.
+        """
+        try:
+            await card.click()
+            # Wait for the description panel to appear
+            for selector in DESCRIPTION_PANEL_SELECTORS:
+                try:
+                    el = await self._page.wait_for_selector(selector, timeout=5000)
+                    if el is not None:
+                        text = await el.text_content()
+                        if text and text.strip():
+                            # Normalize whitespace: collapse runs of whitespace
+                            desc = " ".join(text.split())
+                            await random_sleep(1.0, 2.5)
+                            return desc
+                except Exception:
+                    continue
+        except Exception:
+            logger.debug("Failed to fetch description for card", exc_info=True)
+        return ""
 
     async def _find_cards(self) -> list[Any]:
         """Find job cards using fallback selectors."""
