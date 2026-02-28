@@ -1,4 +1,4 @@
-"""Google Gemini LLM provider."""
+"""Google Gemini LLM provider (google-genai SDK)."""
 
 import logging
 import os
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class GeminiProvider(LLMProvider):
-    """LLM provider using the Google Gemini API."""
+    """LLM provider using the Google Gemini API (google-genai SDK)."""
 
     @property
     def provider_id(self) -> str:
@@ -17,7 +17,7 @@ class GeminiProvider(LLMProvider):
 
     @property
     def default_model(self) -> str:
-        return "gemini-2.0-flash"
+        return "gemini-2.5-flash"
 
     @property
     def env_var(self) -> str:
@@ -36,23 +36,26 @@ class GeminiProvider(LLMProvider):
             raise ValueError(msg)
 
         try:
-            import google.generativeai as genai
+            from google import genai
+            from google.genai import types as genai_types
         except ImportError:
             msg = (
-                "google-generativeai is required for LLM analysis. "
+                "google-genai is required for LLM analysis. "
                 "Install with: pip install 'jobs-search-engine[gemini]'"
             )
             raise ImportError(msg) from None
 
-        genai.configure(api_key=api_key)
         use_model = model or self.default_model
         use_system = system if system is not None else SYSTEM_PROMPT
 
-        logger.info("Sending resume to Gemini API (%s)...", use_model)
-        gen_model = genai.GenerativeModel(
-            model_name=use_model,
-            system_instruction=use_system,
+        logger.info("Sending to Gemini API (%s)...", use_model)
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model=use_model,
+            contents=resume_text,
+            config=genai_types.GenerateContentConfig(
+                system_instruction=use_system,
+            ),
         )
-        response = gen_model.generate_content(resume_text)
 
         return response.text  # type: ignore[no-any-return]

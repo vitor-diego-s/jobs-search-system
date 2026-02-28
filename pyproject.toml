@@ -27,13 +27,13 @@ dev = [
 ]
 anthropic = ["anthropic>=0.40.0"]
 openai = ["openai>=1.0.0"]
-gemini = ["google-generativeai>=0.8.0"]
+gemini = ["google-genai>=1.0.0"]
 profile = ["pymupdf>=1.24.0", "anthropic>=0.40.0"]
 profile-all = [
     "pymupdf>=1.24.0",
     "anthropic>=0.40.0",
     "openai>=1.0.0",
-    "google-generativeai>=0.8.0",
+    "google-genai>=1.0.0",
 ]
 
 [tool.ruff]

@@ -111,7 +111,7 @@ class TestGeminiProvider:
     def test_provider_id(self) -> None:
         provider = get_provider("gemini")
         assert provider.provider_id == "gemini"
-        assert provider.default_model == "gemini-2.0-flash"
+        assert provider.default_model == "gemini-2.5-flash"
         assert provider.env_var == "GOOGLE_API_KEY"
 
     def test_missing_api_key(self) -> None:
@@ -126,8 +126,8 @@ class TestGeminiProvider:
         provider = get_provider("gemini")
         with (
             patch.dict("os.environ", {"GOOGLE_API_KEY": "test-key"}),
-            patch.dict("sys.modules", {"google.generativeai": None, "google": None}),
-            pytest.raises(ImportError, match="google-generativeai is required"),
+            patch.dict("sys.modules", {"google.genai": None, "google": None}),
+            pytest.raises(ImportError, match="google-genai is required"),
         ):
             provider.complete("resume text")
 
@@ -197,21 +197,29 @@ class TestCompleteSystemKwarg:
 
     def test_gemini_uses_custom_system(self) -> None:
         provider = get_provider("gemini")
-        mock_model_instance = MagicMock()
-        mock_model_instance.generate_content.return_value.text = "ok"
-        mock_genai = MagicMock()
-        mock_genai.GenerativeModel.return_value = mock_model_instance
 
-        # Patch only google.generativeai — sys.modules lookup returns mock_genai directly
+        # Mock the new google.genai SDK (google-genai package)
+        # `from google.genai import types as genai_types` resolves via attribute access
+        # on mock_genai, so genai_types == mock_genai.types (not a separate sys.modules entry)
+        mock_genai = MagicMock()
+        mock_client_instance = MagicMock()
+        mock_client_instance.models.generate_content.return_value.text = "ok"
+        mock_genai.Client.return_value = mock_client_instance
+
+        mock_google = MagicMock()
+        mock_google.genai = mock_genai
+
         with (
             patch.dict("os.environ", {"GOOGLE_API_KEY": "key"}),
-            patch.dict("sys.modules", {"google.generativeai": mock_genai}),
+            patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}),
         ):
             provider.complete("text", system="custom system prompt")
 
-        mock_genai.GenerativeModel.assert_called_once()
-        call_kwargs = mock_genai.GenerativeModel.call_args.kwargs
-        assert call_kwargs["system_instruction"] == "custom system prompt"
+        mock_client_instance.models.generate_content.assert_called_once()
+        # genai_types comes from mock_genai.types (attribute access on mock_genai)
+        config_call = mock_genai.types.GenerateContentConfig.call_args
+        assert config_call is not None
+        assert config_call.kwargs["system_instruction"] == "custom system prompt"
 
     def test_openai_uses_custom_system(self) -> None:
         provider = get_provider("openai")
