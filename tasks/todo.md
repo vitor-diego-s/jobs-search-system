@@ -291,6 +291,7 @@ Quota: BLOCKED on second invocation (2/2 searches today)
 
 ## Backlog (Post-MVP)
 
+- [ ] Review llm services accounts and keys
 - [ ] Benchmark LLM providers (Gemini Flash vs Opus) on real DB data — use `scripts/benchmark_llm_scoring.py`
 - [ ] Email/notification when N new candidates found (M11)
 - [ ] Web UI for reviewing candidates (M12)
