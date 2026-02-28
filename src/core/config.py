@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class SearchFilters(BaseModel):
@@ -60,6 +60,25 @@ class ScoringConfig(BaseModel):
     remote_bonus: float = 10.0
     recency_weight: float = Field(default=0.3, ge=0.0, le=1.0)
 
+    # M10 — LLM scoring (off by default)
+    llm_enabled: bool = False
+    llm_provider: str = "gemini"
+    llm_model: str | None = None
+    rule_weight: float = Field(default=0.4, ge=0.0, le=1.0)
+    llm_weight: float = Field(default=0.6, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def weights_sum_to_one(self) -> "ScoringConfig":
+        if self.llm_enabled:
+            total = round(self.rule_weight + self.llm_weight, 10)
+            if abs(total - 1.0) > 1e-9:
+                msg = (
+                    f"rule_weight + llm_weight must equal 1.0 when llm_enabled=True, "
+                    f"got {total}"
+                )
+                raise ValueError(msg)
+        return self
+
 
 class DatabaseConfig(BaseModel):
     """Database configuration."""
@@ -75,6 +94,7 @@ class Settings(BaseModel):
     browser: BrowserConfig = Field(default_factory=BrowserConfig)
     searches: list[SearchConfig] = Field(default_factory=list)
     scoring: ScoringConfig = Field(default_factory=ScoringConfig)
+    profile_path: str = "config/profile.yaml"
 
     @field_validator("searches")
     @classmethod

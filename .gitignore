@@ -34,8 +34,6 @@ Thumbs.db
 # Environment
 .env
 
-# Temp scripts
-scripts/
 
 # Project-specific
 data/*.db

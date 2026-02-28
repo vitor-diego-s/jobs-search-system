@@ -152,6 +152,104 @@ class TestOllamaProvider:
 
 
 # ---------------------------------------------------------------------------
+# system kwarg tests (M10)
+# ---------------------------------------------------------------------------
+class TestCompleteSystemKwarg:
+    """Verify each provider respects the system= kwarg (M10 extension)."""
+
+    def test_anthropic_uses_custom_system(self) -> None:
+        provider = get_provider("anthropic")
+        mock_client = MagicMock()
+        mock_message = MagicMock()
+        mock_message.content = [MagicMock(text="ok")]
+        mock_client.messages.create.return_value = mock_message
+        mock_anthropic = MagicMock()
+        mock_anthropic.Anthropic.return_value = mock_client
+
+        with (
+            patch.dict("os.environ", {"ANTHROPIC_API_KEY": "key"}),
+            patch.dict("sys.modules", {"anthropic": mock_anthropic}),
+        ):
+            provider.complete("text", system="custom system prompt")
+
+        call_kwargs = mock_client.messages.create.call_args.kwargs
+        assert call_kwargs["system"] == "custom system prompt"
+
+    def test_anthropic_falls_back_to_system_prompt(self) -> None:
+        from src.profile.llm.base import SYSTEM_PROMPT
+
+        provider = get_provider("anthropic")
+        mock_client = MagicMock()
+        mock_message = MagicMock()
+        mock_message.content = [MagicMock(text="ok")]
+        mock_client.messages.create.return_value = mock_message
+        mock_anthropic = MagicMock()
+        mock_anthropic.Anthropic.return_value = mock_client
+
+        with (
+            patch.dict("os.environ", {"ANTHROPIC_API_KEY": "key"}),
+            patch.dict("sys.modules", {"anthropic": mock_anthropic}),
+        ):
+            provider.complete("text")  # no system kwarg
+
+        call_kwargs = mock_client.messages.create.call_args.kwargs
+        assert call_kwargs["system"] == SYSTEM_PROMPT
+
+    def test_gemini_uses_custom_system(self) -> None:
+        provider = get_provider("gemini")
+        mock_model_instance = MagicMock()
+        mock_model_instance.generate_content.return_value.text = "ok"
+        mock_genai = MagicMock()
+        mock_genai.GenerativeModel.return_value = mock_model_instance
+
+        # Patch only google.generativeai — sys.modules lookup returns mock_genai directly
+        with (
+            patch.dict("os.environ", {"GOOGLE_API_KEY": "key"}),
+            patch.dict("sys.modules", {"google.generativeai": mock_genai}),
+        ):
+            provider.complete("text", system="custom system prompt")
+
+        mock_genai.GenerativeModel.assert_called_once()
+        call_kwargs = mock_genai.GenerativeModel.call_args.kwargs
+        assert call_kwargs["system_instruction"] == "custom system prompt"
+
+    def test_openai_uses_custom_system(self) -> None:
+        provider = get_provider("openai")
+        mock_openai = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.choices[0].message.content = "ok"
+        mock_openai.OpenAI.return_value.chat.completions.create.return_value = mock_resp
+
+        with (
+            patch.dict("os.environ", {"OPENAI_API_KEY": "key"}),
+            patch.dict("sys.modules", {"openai": mock_openai}),
+        ):
+            provider.complete("text", system="custom system prompt")
+
+        messages = mock_openai.OpenAI.return_value.chat.completions.create.call_args.kwargs[
+            "messages"
+        ]
+        system_msg = next(m for m in messages if m["role"] == "system")
+        assert system_msg["content"] == "custom system prompt"
+
+    def test_ollama_uses_custom_system(self) -> None:
+        provider = get_provider("ollama")
+        mock_openai = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.choices[0].message.content = "ok"
+        mock_openai.OpenAI.return_value.chat.completions.create.return_value = mock_resp
+
+        with patch.dict("sys.modules", {"openai": mock_openai}):
+            provider.complete("text", system="custom system prompt")
+
+        messages = mock_openai.OpenAI.return_value.chat.completions.create.call_args.kwargs[
+            "messages"
+        ]
+        system_msg = next(m for m in messages if m["role"] == "system")
+        assert system_msg["content"] == "custom system prompt"
+
+
+# ---------------------------------------------------------------------------
 # analyze_resume with provider tests
 # ---------------------------------------------------------------------------
 class TestAnalyzeResumeWithProvider:

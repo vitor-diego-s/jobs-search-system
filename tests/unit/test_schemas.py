@@ -81,6 +81,24 @@ class TestScoredCandidate:
         with pytest.raises(ValidationError):
             sc.score = 99.0  # type: ignore[misc]
 
+    def test_llm_score_defaults_none(self) -> None:
+        sc = ScoredCandidate(candidate=_make_candidate())
+        assert sc.llm_score is None
+
+    def test_llm_reasoning_defaults_empty(self) -> None:
+        sc = ScoredCandidate(candidate=_make_candidate())
+        assert sc.llm_reasoning == ""
+
+    def test_llm_score_and_reasoning_set(self) -> None:
+        sc = ScoredCandidate(
+            candidate=_make_candidate(),
+            score=72.0,
+            llm_score=85.0,
+            llm_reasoning="Strong skills match",
+        )
+        assert sc.llm_score == 85.0
+        assert sc.llm_reasoning == "Strong skills match"
+
 
 class TestSearchRunResult:
     def test_create(self) -> None:

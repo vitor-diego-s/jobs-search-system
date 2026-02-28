@@ -83,6 +83,32 @@ class TestScoringConfig:
         with pytest.raises(ValidationError):
             ScoringConfig(recency_weight=1.5)
 
+    def test_llm_defaults(self) -> None:
+        s = ScoringConfig()
+        assert s.llm_enabled is False
+        assert s.llm_provider == "gemini"
+        assert s.llm_model is None
+        assert s.rule_weight == 0.4
+        assert s.llm_weight == 0.6
+
+    def test_weights_sum_to_one_valid(self) -> None:
+        s = ScoringConfig(llm_enabled=True, rule_weight=0.3, llm_weight=0.7)
+        assert s.rule_weight == 0.3
+        assert s.llm_weight == 0.7
+
+    def test_weights_not_sum_to_one_raises_when_enabled(self) -> None:
+        with pytest.raises(ValidationError, match=r"rule_weight \+ llm_weight must equal 1\.0"):
+            ScoringConfig(llm_enabled=True, rule_weight=0.3, llm_weight=0.5)
+
+    def test_weights_not_sum_to_one_ok_when_disabled(self) -> None:
+        # Weight validator only fires when llm_enabled=True
+        s = ScoringConfig(llm_enabled=False, rule_weight=0.3, llm_weight=0.5)
+        assert s.rule_weight == 0.3
+
+    def test_llm_model_override(self) -> None:
+        s = ScoringConfig(llm_model="gemini-2.0-flash-exp")
+        assert s.llm_model == "gemini-2.0-flash-exp"
+
 
 class TestDatabaseConfig:
     def test_default_path(self) -> None:

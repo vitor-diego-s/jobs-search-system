@@ -5,6 +5,7 @@ Data flow (ARCHITECTURE.md section 5):
   2. Adapter search → raw candidates
   3. Filter chain → filtered candidates
   4. Scorer → scored candidates
+  4b. LLM scorer (if enabled) → re-scored candidates
   5. DB upsert
   6. Record quota
 """
@@ -17,6 +18,7 @@ from datetime import datetime
 from src.core.config import SearchConfig, Settings
 from src.core.db import insert_search_run, upsert_candidate
 from src.core.schemas import ScoredCandidate
+from src.pipeline.llm_scorer import score_candidates_llm
 from src.pipeline.matcher import (
     AlreadySeenFilter,
     DeduplicationFilter,
@@ -28,6 +30,7 @@ from src.pipeline.matcher import (
 from src.pipeline.quota_manager import QuotaManager
 from src.pipeline.scorer import score_candidates
 from src.platforms.base import PlatformAdapter
+from src.profile.schema import ProfileData
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +62,7 @@ async def run_search(
     quota_manager: QuotaManager,
     settings: Settings,
     dedup_filter: DeduplicationFilter,
+    profile: ProfileData | None = None,
 ) -> SearchResult | None:
     """Execute a single keyword search through the full pipeline.
 
@@ -91,6 +95,10 @@ async def run_search(
         require_keywords=search_config.require_keywords or None,
         scoring_keywords=search_config.scoring_keywords or None,
     )
+
+    # Step 4b: LLM scoring (optional)
+    if settings.scoring.llm_enabled and profile is not None:
+        scored = score_candidates_llm(scored, profile, settings.scoring)
 
     # Step 5: DB upsert
     new_count = 0
@@ -144,9 +152,14 @@ async def run_all_searches(
     dedup_filter = DeduplicationFilter()
     results: list[SearchResult] = []
 
+    profile: ProfileData | None = None
+    if settings.scoring.llm_enabled:
+        profile = _load_profile(settings.profile_path)
+
     for search_config in settings.searches:
         result = await run_search(
             search_config, adapter, conn, quota_manager, settings, dedup_filter,
+            profile=profile,
         )
         if result is not None:
             results.append(result)
@@ -173,8 +186,23 @@ def export_results_json(results: list[SearchResult]) -> str:
                 "posted_time": c.posted_time,
                 "description_snippet": c.description_snippet,
                 "score": s.score,
+                "llm_score": s.llm_score,
+                "llm_reasoning": s.llm_reasoning,
             })
     return json.dumps(data, indent=2)
+
+
+def _load_profile(path: str) -> ProfileData | None:
+    """Load ProfileData from YAML. Returns None on failure (logs warning)."""
+    try:
+        return ProfileData.from_yaml(path)
+    except Exception:
+        logger.warning(
+            "Failed to load profile from '%s' — LLM scoring disabled for this run",
+            path,
+            exc_info=True,
+        )
+        return None
 
 
 def _build_filters(

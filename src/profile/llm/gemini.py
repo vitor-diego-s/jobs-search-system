@@ -23,7 +23,13 @@ class GeminiProvider(LLMProvider):
     def env_var(self) -> str:
         return "GOOGLE_API_KEY"
 
-    def complete(self, resume_text: str, model: str | None = None) -> str:
+    def complete(
+        self,
+        resume_text: str,
+        model: str | None = None,
+        *,
+        system: str | None = None,
+    ) -> str:
         api_key = os.environ.get("GOOGLE_API_KEY")
         if not api_key:
             msg = "GOOGLE_API_KEY environment variable is required"
@@ -40,11 +46,12 @@ class GeminiProvider(LLMProvider):
 
         genai.configure(api_key=api_key)
         use_model = model or self.default_model
+        use_system = system if system is not None else SYSTEM_PROMPT
 
         logger.info("Sending resume to Gemini API (%s)...", use_model)
         gen_model = genai.GenerativeModel(
             model_name=use_model,
-            system_instruction=SYSTEM_PROMPT,
+            system_instruction=use_system,
         )
         response = gen_model.generate_content(resume_text)
 

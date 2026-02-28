@@ -45,3 +45,11 @@ scoring:
   easy_apply_bonus: 10
   remote_bonus: 10
   recency_weight: 0.3
+  # LLM scoring (M10) — set llm_enabled: true to activate
+  llm_enabled: false
+  llm_provider: gemini        # gemini | anthropic | openai | ollama
+  llm_model: null             # null = provider default (gemini-2.0-flash)
+  rule_weight: 0.4
+  llm_weight: 0.6
+
+profile_path: config/profile.yaml

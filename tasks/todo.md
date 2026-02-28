@@ -253,9 +253,45 @@ Quota: BLOCKED on second invocation (2/2 searches today)
 
 ---
 
+## Milestone 10 — LLM-Assisted Relevance Scoring ✓
+
+**Goal:** Blend rule-based scores with LLM evaluation of job descriptions against profile.
+
+- [x] `src/core/config.py` — Add LLM fields to `ScoringConfig` (`llm_enabled`, `llm_provider`, `llm_model`, `rule_weight`, `llm_weight`); weight validator; `profile_path` to `Settings`
+- [x] `src/core/schemas.py` — Add `llm_score` and `llm_reasoning` to `ScoredCandidate`
+- [x] `src/core/db.py` — `_add_column_if_missing()` helper; schema evolution in `init_db()`; update `upsert_candidate()`
+- [x] `src/profile/llm/base.py` — Add `system` kwarg to `complete()` ABC
+- [x] `src/profile/llm/gemini.py` — Use `system` kwarg (~2 lines)
+- [x] `src/profile/llm/anthropic.py` — Use `system` kwarg (~2 lines)
+- [x] `src/profile/llm/openai.py` — Use `system` kwarg (~2 lines)
+- [x] `src/profile/llm/ollama.py` — Use `system` kwarg (~2 lines)
+- [x] `src/pipeline/llm_scorer.py` — **New**: scoring system prompt, `_build_user_prompt`, `_parse_llm_score`, `score_candidate_llm`, `score_candidates_llm`
+- [x] `src/pipeline/orchestrator.py` — Wire step 4b; `_load_profile()` helper; export `llm_score`/`llm_reasoning`
+- [x] `config/settings.yaml` — Add LLM scoring config section
+- [x] `tests/unit/test_llm_scorer.py` — **New** 35 tests across 4 test classes
+- [x] `tests/unit/test_config.py` — ScoringConfig LLM fields + weight validator tests
+- [x] `tests/unit/test_schemas.py` — ScoredCandidate new field defaults
+- [x] `tests/unit/test_llm_providers.py` — `complete()` with custom `system` kwarg (5 new tests)
+- [x] `tests/integration/test_search_pipeline.py` — LLM pipeline + export + DB persistence (4 new tests)
+- [x] `scripts/benchmark_llm_scoring.py` — **New** benchmarking script (Gemini vs Opus comparison)
+
+**Verification:**
+- [x] `ruff check src/ tests/ main.py scripts/` — passes
+- [x] `mypy src/ main.py` — pre-existing issues only (yaml stubs, anthropic type), 0 new errors
+- [x] `pytest tests/ -v` — **292 tests passed** (257 existing + 35 new)
+- [x] `llm_enabled: false` (default) → zero LLM calls, no regression
+- [x] `llm_enabled: true` + mock provider → blended scores computed correctly
+- [x] Weight validator: `rule_weight=0.3, llm_weight=0.5` → raises ValidationError
+- [x] LLM failure for one candidate → others still scored, batch continues
+- [x] Candidates without `description_snippet` → skip LLM, keep rule-based score
+- [x] JSON export includes `llm_score` and `llm_reasoning`
+- [x] DB roundtrip: `llm_score` and `llm_reasoning` persisted via `_add_column_if_missing()`
+
+---
+
 ## Backlog (Post-MVP)
 
-- [ ] LLM-assisted relevance scoring (M10) — deferred from OQ-2 (M9 prerequisite done)
+- [ ] Benchmark LLM providers (Gemini Flash vs Opus) on real DB data — use `scripts/benchmark_llm_scoring.py`
 - [ ] Email/notification when N new candidates found (M11)
 - [ ] Web UI for reviewing candidates (M12)
 - [ ] Export to Notion or Airtable (M13)

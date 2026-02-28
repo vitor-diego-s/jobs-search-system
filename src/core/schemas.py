@@ -33,6 +33,8 @@ class ScoredCandidate(BaseModel):
 
     candidate: JobCandidate
     score: float = Field(default=0.0, ge=0.0, le=100.0)
+    llm_score: float | None = None     # None = not LLM-scored
+    llm_reasoning: str = ""
 
 
 class SearchRunResult(BaseModel):

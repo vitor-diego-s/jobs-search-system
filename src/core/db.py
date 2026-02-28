@@ -50,6 +50,21 @@ CREATE TABLE IF NOT EXISTS search_runs (
 """
 
 
+def _add_column_if_missing(
+    conn: sqlite3.Connection,
+    table: str,
+    column: str,
+    definition: str,
+) -> None:
+    """Add a column to a table if it doesn't already exist (safe migration)."""
+    existing = {
+        row[1]
+        for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+    }
+    if column not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
 def init_db(path: str | Path) -> sqlite3.Connection:
     """Create the database and tables, returning a connection."""
     path = Path(path)
@@ -60,6 +75,9 @@ def init_db(path: str | Path) -> sqlite3.Connection:
     conn.execute(_CANDIDATES_TABLE)
     conn.execute(_QUOTA_TABLE)
     conn.execute(_SEARCH_RUNS_TABLE)
+    # M10 schema evolution — safe to run on existing DBs
+    _add_column_if_missing(conn, "candidates", "llm_score", "REAL")
+    _add_column_if_missing(conn, "candidates", "llm_reasoning", "TEXT NOT NULL DEFAULT ''")
     conn.commit()
     return conn
 
@@ -76,8 +94,8 @@ def upsert_candidate(conn: sqlite3.Connection, scored: ScoredCandidate) -> bool:
             INSERT INTO candidates
                 (external_id, platform, title, company, location, url,
                  is_easy_apply, workplace_type, posted_time, description_snippet,
-                 score, found_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 score, llm_score, llm_reasoning, found_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 c.external_id,
@@ -91,6 +109,8 @@ def upsert_candidate(conn: sqlite3.Connection, scored: ScoredCandidate) -> bool:
                 c.posted_time,
                 c.description_snippet,
                 scored.score,
+                scored.llm_score,
+                scored.llm_reasoning,
                 c.found_at.isoformat(),
             ),
         )

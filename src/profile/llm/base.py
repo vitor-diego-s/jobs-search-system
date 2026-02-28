@@ -53,12 +53,19 @@ class LLMProvider(ABC):
         """Unique identifier for this provider (e.g. 'anthropic')."""
 
     @abstractmethod
-    def complete(self, resume_text: str, model: str | None = None) -> str:
+    def complete(
+        self,
+        resume_text: str,
+        model: str | None = None,
+        *,
+        system: str | None = None,
+    ) -> str:
         """Send resume text to the LLM and return raw response text.
 
         Args:
             resume_text: Plain text extracted from a resume PDF.
             model: Override the provider's default model. None uses default.
+            system: Override the system prompt. None falls back to SYSTEM_PROMPT.
 
         Returns:
             Raw text response from the LLM (expected to be JSON).

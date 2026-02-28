@@ -2,6 +2,8 @@
 
 import json
 import sqlite3
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -317,3 +319,159 @@ class TestExportJson:
     def test_export_empty(self) -> None:
         output = export_results_json([])
         assert json.loads(output) == []
+
+    def test_export_includes_llm_fields(self) -> None:
+        from src.core.schemas import ScoredCandidate
+
+        scored = [ScoredCandidate(
+            candidate=_candidate(external_id="llm1"),
+            score=68.0,
+            llm_score=80.0,
+            llm_reasoning="Strong match",
+        )]
+        result = SearchResult(
+            keyword="test",
+            platform="linkedin",
+            raw_count=1,
+            filtered_count=1,
+            new_count=1,
+            scored=scored,
+        )
+        output = export_results_json([result])
+        data = json.loads(output)
+        assert data[0]["llm_score"] == 80.0
+        assert data[0]["llm_reasoning"] == "Strong match"
+
+    def test_export_llm_fields_null_when_not_scored(self) -> None:
+        from src.core.schemas import ScoredCandidate
+
+        scored = [ScoredCandidate(candidate=_candidate(external_id="no-llm"), score=50.0)]
+        result = SearchResult(
+            keyword="test",
+            platform="linkedin",
+            raw_count=1,
+            filtered_count=1,
+            new_count=1,
+            scored=scored,
+        )
+        output = export_results_json([result])
+        data = json.loads(output)
+        assert data[0]["llm_score"] is None
+        assert data[0]["llm_reasoning"] == ""
+
+
+class TestLlmScoringPipeline:
+    """Integration tests: pipeline with LLM scoring enabled."""
+
+    @pytest.fixture
+    def db(self, tmp_path: pytest.TempPathFactory) -> sqlite3.Connection:  # type: ignore[type-arg]
+        return init_db(tmp_path / "test.db")
+
+    def _profile_yaml(self, tmp_path: Path) -> str:
+        import yaml
+
+        profile = {
+            "name": "Jane Dev",
+            "search_keywords": ["Senior Python Engineer"],
+            "seniority": "senior",
+            "scoring_keywords": ["Python", "FastAPI"],
+            "years_of_experience": 8,
+            "preferred_workplace": ["remote"],
+        }
+        p = tmp_path / "profile.yaml"
+        p.write_text(yaml.dump(profile))
+        return str(p)
+
+    async def test_llm_scoring_blends_correctly(
+        self, db: sqlite3.Connection, tmp_path: Path
+    ) -> None:
+        """Pipeline with llm_enabled=True applies blended scoring (mock provider)."""
+        profile_path = self._profile_yaml(tmp_path)
+
+        candidates = [
+            JobCandidate(
+                external_id="llm-c1",
+                platform="linkedin",
+                title="Senior Python Engineer",
+                company="Acme",
+                url="https://linkedin.com/jobs/view/llm-c1/",
+                is_easy_apply=True,
+                workplace_type="remote",
+                posted_time="1 day ago",
+                description_snippet="Looking for a Senior Python Engineer with FastAPI skills.",
+            ),
+        ]
+        adapter = MockAdapter(candidates)
+
+        scoring = ScoringConfig(
+            llm_enabled=True,
+            llm_provider="gemini",
+            rule_weight=0.4,
+            llm_weight=0.6,
+        )
+        settings = Settings(
+            searches=[SearchConfig(keyword="Senior Python Engineer", platform="linkedin")],
+            quotas={"linkedin": QuotaPlatformConfig(max_searches_per_day=5)},
+            scoring=scoring,
+            profile_path=profile_path,
+        )
+
+        mock_provider = MagicMock()
+        mock_provider.complete.return_value = '{"score": 90, "reasoning": "Perfect match"}'
+
+        with patch("src.pipeline.llm_scorer.get_provider", return_value=mock_provider):
+            results = await run_all_searches(settings, adapter, db)
+
+        assert len(results) == 1
+        scored = results[0].scored
+        assert len(scored) == 1
+        # rule_score would be computed from scorer, llm=90 → blended = 0.4*rule + 0.6*90
+        assert scored[0].llm_score == 90.0
+        assert scored[0].llm_reasoning == "Perfect match"
+        # Blended score should reflect LLM contribution
+        assert scored[0].score > 0
+
+    async def test_llm_scores_persisted_in_db(
+        self, db: sqlite3.Connection, tmp_path: Path
+    ) -> None:
+        """LLM score and reasoning are persisted in the candidates table."""
+        profile_path = self._profile_yaml(tmp_path)
+
+        candidates = [
+            JobCandidate(
+                external_id="persist-1",
+                platform="linkedin",
+                title="Senior Python Engineer",
+                company="Corp",
+                url="https://linkedin.com/jobs/view/persist-1/",
+                description_snippet="Python FastAPI position.",
+            ),
+        ]
+        adapter = MockAdapter(candidates)
+
+        scoring = ScoringConfig(
+            llm_enabled=True,
+            llm_provider="gemini",
+            rule_weight=0.4,
+            llm_weight=0.6,
+        )
+        settings = Settings(
+            searches=[SearchConfig(keyword="Python", platform="linkedin")],
+            quotas={"linkedin": QuotaPlatformConfig(max_searches_per_day=5)},
+            scoring=scoring,
+            profile_path=profile_path,
+        )
+
+        mock_provider = MagicMock()
+        mock_provider.complete.return_value = '{"score": 75, "reasoning": "Good fit"}'
+
+        with patch("src.pipeline.llm_scorer.get_provider", return_value=mock_provider):
+            await run_all_searches(settings, adapter, db)
+
+        row = db.execute(
+            "SELECT llm_score, llm_reasoning FROM candidates WHERE external_id = ?",
+            ("persist-1",),
+        ).fetchone()
+        assert row is not None
+        assert row["llm_score"] == 75.0
+        assert row["llm_reasoning"] == "Good fit"

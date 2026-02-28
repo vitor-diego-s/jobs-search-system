@@ -24,7 +24,13 @@ class OllamaProvider(LLMProvider):
     def env_var(self) -> None:
         return None
 
-    def complete(self, resume_text: str, model: str | None = None) -> str:
+    def complete(
+        self,
+        resume_text: str,
+        model: str | None = None,
+        *,
+        system: str | None = None,
+    ) -> str:
         try:
             import openai
         except ImportError:
@@ -36,12 +42,13 @@ class OllamaProvider(LLMProvider):
 
         client = openai.OpenAI(base_url=_OLLAMA_BASE_URL, api_key="ollama")
         use_model = model or self.default_model
+        use_system = system if system is not None else SYSTEM_PROMPT
 
         logger.info("Sending resume to Ollama (%s)...", use_model)
         response = client.chat.completions.create(
             model=use_model,
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": use_system},
                 {"role": "user", "content": resume_text},
             ],
         )

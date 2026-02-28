@@ -23,7 +23,13 @@ class OpenAIProvider(LLMProvider):
     def env_var(self) -> str:
         return "OPENAI_API_KEY"
 
-    def complete(self, resume_text: str, model: str | None = None) -> str:
+    def complete(
+        self,
+        resume_text: str,
+        model: str | None = None,
+        *,
+        system: str | None = None,
+    ) -> str:
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             msg = "OPENAI_API_KEY environment variable is required"
@@ -40,12 +46,13 @@ class OpenAIProvider(LLMProvider):
 
         client = openai.OpenAI(api_key=api_key)
         use_model = model or self.default_model
+        use_system = system if system is not None else SYSTEM_PROMPT
 
         logger.info("Sending resume to OpenAI API (%s)...", use_model)
         response = client.chat.completions.create(
             model=use_model,
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": use_system},
                 {"role": "user", "content": resume_text},
             ],
         )

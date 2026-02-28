@@ -23,7 +23,13 @@ class AnthropicProvider(LLMProvider):
     def env_var(self) -> str:
         return "ANTHROPIC_API_KEY"
 
-    def complete(self, resume_text: str, model: str | None = None) -> str:
+    def complete(
+        self,
+        resume_text: str,
+        model: str | None = None,
+        *,
+        system: str | None = None,
+    ) -> str:
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
             msg = "ANTHROPIC_API_KEY environment variable is required"
@@ -40,12 +46,13 @@ class AnthropicProvider(LLMProvider):
 
         client = anthropic.Anthropic(api_key=api_key)
         use_model = model or self.default_model
+        use_system = system if system is not None else SYSTEM_PROMPT
 
         logger.info("Sending resume to Anthropic API (%s)...", use_model)
         message = client.messages.create(
             model=use_model,
             max_tokens=1024,
-            system=SYSTEM_PROMPT,
+            system=use_system,
             messages=[{"role": "user", "content": resume_text}],
         )
 
