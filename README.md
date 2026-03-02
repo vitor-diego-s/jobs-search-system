@@ -7,10 +7,15 @@ A general-purpose, multi-platform job search engine that automates discovery and
 ## What It Does
 
 1. Runs keyword searches across job platforms (LinkedIn first, others planned)
-2. Applies a configurable filter chain: exclude keywords → positive keywords → deduplication → already-seen
-3. Scores candidates by relevance (title match, seniority, workplace type, recency)
-4. Writes new candidates to a local SQLite database
-5. Enforces daily search quotas per platform to avoid rate limiting
+2. Fetches full job descriptions from listing side-panels
+3. Applies a configurable filter chain: exclude keywords → positive keywords → deduplication → already-seen
+4. Scores candidates by relevance using a **dual-scorer pipeline**:
+   - Rule-based: title keyword match, seniority, easy_apply, remote, recency
+   - LLM-assisted: sends structured profile + job description to an LLM for semantic evaluation
+   - Blended: `0.4 × rule_score + 0.6 × llm_score`
+5. Extracts `scoring_keywords` from your resume PDF via LLM analysis
+6. Writes new candidates to a local SQLite database
+7. Enforces daily search quotas per platform to avoid rate limiting
 
 It does **not** apply to jobs, manage profiles, or automate logins.
 
@@ -19,15 +24,17 @@ It does **not** apply to jobs, manage profiles, or automate logins.
 ## Architecture Overview
 
 ```
-Config (settings.yaml)
+Config (settings.yaml) + Profile (profile.yaml)
         │
         ▼
   Orchestrator
   ├── QuotaManager     → gate: can we search today?
-  ├── PlatformAdapter  → search + parse (LinkedIn, ...)
+  ├── PlatformAdapter  → search + parse + fetch descriptions (LinkedIn, ...)
   ├── FilterChain      → exclude → dedup → already-seen
-  ├── Scorer           → relevance score 0–100
-  └── DB Writer        → SQLite upsert
+  ├── Scorer           → rule-based relevance score 0–100
+  ├── LLM Scorer       → LLM-assisted scoring (optional, blended with rules)
+  │   └── LLM Provider → gemini | anthropic | openai | ollama
+  └── DB Writer        → SQLite upsert (score + llm_score + llm_reasoning)
 ```
 
 Each platform is isolated behind a `PlatformAdapter` interface. Core pipeline logic (filtering, scoring, quota) is platform-agnostic and fully testable without a browser.
@@ -40,7 +47,7 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design including
 
 | Platform | Status | Auth |
 |----------|--------|------|
-| LinkedIn | Planned (M2) | Cookie injection |
+| LinkedIn | Complete (M2–M10) | Cookie injection |
 | Glassdoor | Backlog | TBD |
 | Indeed | Backlog | TBD |
 
@@ -53,6 +60,8 @@ All behavior is driven by `config/settings.yaml`:
 ```yaml
 database:
   path: data/candidates.db
+
+profile_path: config/profile.yaml   # Resume-derived profile for LLM scoring
 
 quotas:
   linkedin:
@@ -71,6 +80,17 @@ searches:
       - Junior
       - PHP
       - Frontend
+    scoring_keywords:          # LLM-extracted skills for title matching + LLM context
+      - Python
+      - FastAPI
+      - PostgreSQL
+    fetch_description: false   # Enable job description extraction
+
+scoring:
+  llm_enabled: false           # Enable dual-scorer pipeline
+  llm_provider: gemini         # gemini | anthropic | openai | ollama
+  rule_weight: 0.4
+  llm_weight: 0.6
 ```
 
 ---
@@ -116,12 +136,15 @@ For browser-based platforms (LinkedIn), these are hard constraints — not confi
 
 ```
 jobs-search-engine/
-├── config/             # settings.yaml, linkedin_cookies.json
+├── config/             # settings.yaml, profile.yaml, linkedin_cookies.json
 ├── src/
 │   ├── core/           # schemas, config models, DB layer
-│   ├── pipeline/       # orchestrator, matcher, quota manager, scorer
+│   ├── pipeline/       # orchestrator, matcher, quota manager, scorer, llm_scorer
 │   ├── platforms/      # platform adapters (linkedin/, ...)
+│   ├── profile/        # resume extraction, LLM analyzer, profile schema
+│   │   └── llm/        # provider adapters (anthropic, gemini, openai, ollama)
 │   └── browser/        # patchright session + reusable actions
+├── scripts/            # benchmark_llm_scoring.py, extract_cookies.py
 ├── tests/
 │   ├── unit/           # pure logic tests (no browser required)
 │   ├── integration/    # full pipeline with mock adapter
@@ -149,9 +172,10 @@ pytest tests/integration/
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System design, interfaces, DB schema, ADRs |
 | [`docs/lessons-applied.md`](docs/lessons-applied.md) | Engineering lessons from the previous iteration |
 | [`tasks/todo.md`](tasks/todo.md) | Milestone checklist |
+| [`tasks/plan-m10.md`](tasks/plan-m10.md) | M10 LLM-assisted relevance scoring implementation plan |
 
 ---
 
 ## Status
 
-**Milestone 0 — Foundation** (current): documentation and planning complete, implementation starting.
+**Milestone 10 — LLM-Assisted Relevance Scoring** (current): 301 tests passing. Full pipeline operational: LinkedIn search, description fetching, rule-based + LLM-assisted dual scoring, multi-provider support (Gemini, Anthropic, OpenAI, Ollama).

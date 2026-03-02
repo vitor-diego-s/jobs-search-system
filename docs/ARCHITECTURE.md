@@ -1,8 +1,8 @@
 # Architecture Design
 # jobs-search-engine
 
-**Version:** 0.1 (Draft)
-**Date:** 2026-02-24
+**Version:** 0.2 (M10 — LLM-Assisted Scoring)
+**Date:** 2026-03-02
 
 ---
 
@@ -53,17 +53,19 @@
 ```
 jobs-search-engine/
 ├── config/
-│   └── settings.yaml              # User-facing configuration
+│   ├── settings.yaml              # User-facing configuration
+│   └── profile.yaml               # Resume-derived profile (scoring_keywords, seniority, etc.)
 ├── src/
 │   ├── core/
-│   │   ├── schemas.py             # JobCandidate, SearchRun, QuotaState (Pydantic)
+│   │   ├── schemas.py             # JobCandidate, ScoredCandidate, SearchRunResult (Pydantic)
 │   │   ├── config.py              # Config models + loader (Pydantic)
-│   │   └── db.py                  # SQLite connection + table definitions
+│   │   └── db.py                  # SQLite connection + table definitions + migrations
 │   ├── pipeline/
 │   │   ├── orchestrator.py        # Main entry point: loads config, runs searches, writes output
 │   │   ├── matcher.py             # Filter chain: exclude → dedup → already_seen → score
 │   │   ├── quota_manager.py       # Daily quota tracking + enforcement
-│   │   └── scorer.py              # Relevance scoring (rule-based)
+│   │   ├── scorer.py              # Relevance scoring (rule-based)
+│   │   └── llm_scorer.py          # LLM-assisted scoring (prompt builder, parser, blending)
 │   ├── platforms/
 │   │   ├── base.py                # Abstract PlatformAdapter interface
 │   │   ├── linkedin/
@@ -72,16 +74,35 @@ jobs-search-engine/
 │   │   │   ├── parser.py          # DOM → JobCandidate (all selector logic here)
 │   │   │   └── selectors.py       # Selector constants with fallback lists
 │   │   └── (glassdoor/, indeed/)  # Future adapters
+│   ├── profile/
+│   │   ├── extractor.py           # PDF → plain text (pymupdf)
+│   │   ├── llm_analyzer.py        # Facade: analyze_resume() → ProfileData
+│   │   ├── schema.py              # ProfileData Pydantic model
+│   │   ├── generator.py           # ProfileData → settings.yaml dict
+│   │   └── llm/
+│   │       ├── base.py            # LLMProvider ABC + SYSTEM_PROMPT
+│   │       ├── anthropic.py       # Claude provider (claude-sonnet-4-20250514)
+│   │       ├── gemini.py          # Gemini provider (gemini-2.5-flash, google-genai SDK)
+│   │       ├── openai.py          # GPT-4o-mini provider
+│   │       └── ollama.py          # Local Ollama provider (llama3, OpenAI-compat API)
 │   └── browser/
 │       ├── session.py             # Patchright browser init, cookie loading
 │       └── actions.py             # Reusable: scroll, wait_for_cards, safe_text
+├── scripts/
+│   ├── benchmark_llm_scoring.py   # Provider comparison benchmark (Gemini vs Opus)
+│   └── extract_cookies.py         # Browser cookie export helper
 ├── tests/
 │   ├── unit/
 │   │   ├── test_url_builder.py    # URL construction (pure, no browser)
 │   │   ├── test_parser.py         # Parser with HTML fixtures (no browser)
 │   │   ├── test_matcher.py        # Filter chain logic
 │   │   ├── test_quota_manager.py  # Quota: reset, gate, increment
-│   │   └── test_scorer.py         # Scoring logic
+│   │   ├── test_scorer.py         # Rule-based scoring logic
+│   │   ├── test_llm_scorer.py     # LLM scorer: prompt building, parsing, blending
+│   │   ├── test_llm_providers.py  # Provider registry + all 4 provider adapters
+│   │   ├── test_llm_analyzer.py   # Resume analysis facade + response parsing
+│   │   ├── test_profile_schema.py # ProfileData validation, YAML round-trip
+│   │   └── test_profile_extractor.py  # PDF text extraction
 │   ├── integration/
 │   │   └── test_search_pipeline.py  # Full search with mock adapter
 │   └── fixtures/
@@ -137,9 +158,12 @@ class JobCandidate(BaseModel):
     workplace_type: str        # "remote" | "hybrid" | "onsite" | ""
     posted_time: str           # Human-readable: "2 days ago"
     description_snippet: str   # "" unless description fetch is enabled
-    score: float = 0.0         # Filled by scorer after filtering
     found_at: datetime         # When this candidate was collected
 ```
+
+> **Note:** `score` is not on `JobCandidate` — it lives on the `ScoredCandidate` wrapper
+> (see ADR-005). `ScoredCandidate` holds `candidate: JobCandidate`, `score: float`,
+> `llm_score: float | None`, and `llm_reasoning: str`.
 
 ### 4.3 `FilterChain` (pipeline step)
 
@@ -173,26 +197,49 @@ State stored in `quota` table in SQLite. Auto-resets when `date != today`.
 
 ---
 
-## 5. Data Flow (Single Search Run)
 
-```
-1. CLI invoked  →  load + validate config/settings.yaml
-2. QuotaManager.can_search(platform)  →  if False, exit early
-3. Browser session init (patchright, load cookies)
-4. For each search in config.searches:
-   a. LinkedInAdapter.search(search_config)
-      - Build paginated URLs
-      - For each page:
-          i.  page.goto(url)
-          ii. scroll_until_stable()
-          iii. parser.parse_cards(page) → list[JobCandidate]
-      - return all candidates from all pages
-   b. FilterChain.apply(candidates)  →  filtered candidates
-   c. Scorer.score(filtered)  →  scored candidates
-   d. DB.upsert(scored)
-   e. QuotaManager.record_search(platform)
-5. Print summary: N searched, M filtered, K new
-6. Browser close
+## 5. Scoring Pipeline (Sequence Diagram)
+
+```mermaid
+sequenceDiagram
+    participant O as Orchestrator
+    participant S as Scorer (rule-based)
+    participant L as LLMScorer
+    participant P as ProfileData
+    participant LLM as LLM Provider
+    participant DB as SQLite
+
+    O->>S: score_candidates(filtered, scoring_config,<br/>require_keywords, scoring_keywords)
+    activate S
+    loop Each candidate
+        S->>S: +20 per scoring_keyword in title
+        S->>S: +15 seniority match
+        S->>S: +10 easy_apply, +10 remote
+        S->>S: +recency bonus (time decay)
+        S->>S: clamp(0, 100)
+    end
+    S-->>O: list[ScoredCandidate] sorted by score
+    deactivate S
+
+    alt llm_enabled AND profile loaded
+        O->>L: score_candidates_llm(scored, profile, config)
+        activate L
+        L->>P: load scoring_keywords, seniority, target roles
+        loop Each candidate with description_snippet
+            L->>L: _build_user_prompt(profile, candidate)
+            L->>LLM: complete(prompt, system=scoring_rubric)
+            LLM-->>L: {"score": 0-100, "reasoning": "..."}
+            L->>L: _parse_llm_score(response)
+            L->>L: blended = 0.4 × rule_score + 0.6 × llm_score
+        end
+        L->>L: re-sort by blended score DESC
+        L-->>O: list[ScoredCandidate] with llm_score, llm_reasoning
+        deactivate L
+    end
+
+    loop Each scored candidate
+        O->>DB: upsert(score, llm_score, llm_reasoning)
+    end
 ```
 
 ---
@@ -203,23 +250,28 @@ State stored in `quota` table in SQLite. Auto-resets when `date != today`.
 
 ```sql
 CREATE TABLE IF NOT EXISTS candidates (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    external_id   TEXT    NOT NULL,
-    platform      TEXT    NOT NULL,
-    title         TEXT    NOT NULL,
-    company       TEXT    NOT NULL DEFAULT '',
-    location      TEXT    NOT NULL DEFAULT '',
-    url           TEXT    NOT NULL,
-    is_easy_apply INTEGER NOT NULL DEFAULT 0,
-    workplace_type TEXT   NOT NULL DEFAULT '',
-    posted_time   TEXT    NOT NULL DEFAULT '',
-    description_snippet TEXT NOT NULL DEFAULT '',
-    score         REAL    NOT NULL DEFAULT 0.0,
-    status        TEXT    NOT NULL DEFAULT 'new',
-    found_at      TEXT    NOT NULL,
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    external_id         TEXT    NOT NULL,
+    platform            TEXT    NOT NULL,
+    title               TEXT    NOT NULL,
+    company             TEXT    NOT NULL DEFAULT '',
+    location            TEXT    NOT NULL DEFAULT '',
+    url                 TEXT    NOT NULL,
+    is_easy_apply       INTEGER NOT NULL DEFAULT 0,
+    workplace_type      TEXT    NOT NULL DEFAULT '',
+    posted_time         TEXT    NOT NULL DEFAULT '',
+    description_snippet TEXT    NOT NULL DEFAULT '',
+    score               REAL    NOT NULL DEFAULT 0.0,
+    llm_score           REAL,                            -- NULL = not LLM-scored
+    llm_reasoning       TEXT    NOT NULL DEFAULT '',      -- 1-2 sentence LLM explanation
+    status              TEXT    NOT NULL DEFAULT 'new',
+    found_at            TEXT    NOT NULL,
     UNIQUE(external_id, platform)
 );
 ```
+
+> **Migration note:** `llm_score` and `llm_reasoning` are added via safe
+> `ALTER TABLE ADD COLUMN` in `init_db()` — existing databases are upgraded transparently.
 
 ### `quota` table
 
@@ -256,6 +308,8 @@ CREATE TABLE IF NOT EXISTS search_runs (
 database:
   path: data/candidates.db
 
+profile_path: config/profile.yaml   # Resume-derived profile for LLM scoring
+
 quotas:
   linkedin:
     max_searches_per_day: 2
@@ -280,7 +334,12 @@ searches:
       - Ruby
       - Frontend
       - "React Native"
-    require_keywords: []        # Optional: title must contain one of these
+    require_keywords: []          # Optional: title must contain one of these
+    scoring_keywords:             # LLM-extracted tech skills for title matching + LLM context
+      - Python
+      - FastAPI
+      - PostgreSQL
+    fetch_description: false      # Enable side-panel description extraction
 
   - keyword: "Staff Backend Engineer Python"
     platform: linkedin
@@ -291,11 +350,17 @@ searches:
       max_pages: 2
 
 scoring:
-  title_match_bonus: 20         # Points for each require_keyword hit
-  seniority_match_bonus: 15     # Points for matching seniority level
+  title_match_bonus: 20           # Points for each scoring_keyword hit in title
+  seniority_match_bonus: 15       # Points for matching seniority level
   easy_apply_bonus: 10
   remote_bonus: 10
-  recency_weight: 0.3           # Higher = prefer recent posts
+  recency_weight: 0.3             # Higher = prefer recent posts
+  # LLM-assisted scoring (M10)
+  llm_enabled: false              # Set true to enable dual-scorer pipeline
+  llm_provider: gemini            # gemini | anthropic | openai | ollama
+  llm_model: null                 # null = provider default (e.g. gemini-2.5-flash)
+  rule_weight: 0.4                # Weight for rule-based score in blending
+  llm_weight: 0.6                 # Weight for LLM score (must sum to 1.0 with rule_weight)
 ```
 
 ---
@@ -321,7 +386,11 @@ These are non-negotiable for LinkedIn and any browser-based platform:
 | URL builder | Pure unit tests — no browser | pytest |
 | Parser | Tests against saved HTML fixtures | pytest + BeautifulSoup (for fixture gen) |
 | Filter chain | Pure unit tests with synthetic candidates | pytest |
-| Scorer | Pure unit tests with synthetic inputs | pytest |
+| Scorer (rule-based) | Pure unit tests with synthetic inputs | pytest |
+| LLM scorer | Prompt building, response parsing, blending logic | pytest + mock LLM |
+| LLM providers | Registry, all 4 adapters, system prompt override | pytest + mock SDKs |
+| Profile extraction | PDF → text, schema validation, YAML round-trip | pytest + mock pymupdf |
+| Profile analyzer | Response parsing (JSON, markdown), facade | pytest + mock provider |
 | Quota manager | Unit tests with in-memory SQLite | pytest |
 | Platform adapter | Integration tests with mock `page` object | pytest + AsyncMock |
 | Full pipeline | E2E dry-run with saved HTML | pytest |
@@ -351,6 +420,32 @@ No test should require a live browser or internet connection.
 **Decision:** Each filter is a standalone function/class, not a monolithic `match()` function.
 **Rationale:** Enables independent testing of each filter, easy reordering, and addition of new filters without regression risk.
 
-### ADR-005: Score field on JobCandidate is mutable
-**Decision:** `JobCandidate` is frozen except for `score` (added as a separate step).
-**Rationale:** Scoring happens after filtering, so score is not part of the parsed data. Two options: (a) mutable score field, (b) `ScoredCandidate(candidate=..., score=...)` wrapper. Chose wrapper to keep the core schema frozen.
+### ADR-005: ScoredCandidate wrapper over mutable score field
+**Decision:** `JobCandidate` is frozen; scoring is on a `ScoredCandidate(candidate=..., score=...)` wrapper.
+**Rationale:** Scoring happens after filtering, so score is not part of the parsed data. Two options: (a) mutable score field, (b) `ScoredCandidate` wrapper. Chose wrapper to keep the core schema frozen.
+
+### ADR-006: scoring_keywords over full resume text
+**Decision:** Use 5–15 LLM-extracted `scoring_keywords` (technical skills) instead of sending the full resume text to the scoring pipeline.
+
+**Context:** The scoring pipeline has two layers — rule-based and LLM-assisted. Both need to know the candidate's skills to evaluate job fit. The question is whether to pass the full resume (~2–5K tokens) or a compact keyword list.
+
+**How scoring_keywords are used:**
+- **Rule-based scorer:** substring match against job title — each `scoring_keyword` hit adds +20 points. Fast, deterministic, zero-cost.
+- **LLM scorer:** keywords sent as "Core skills" in the structured prompt alongside `description_snippet`, target roles, and seniority. The LLM evaluates fit holistically.
+
+**Why keywords are the right abstraction:**
+
+For the rule-based layer:
+- Title matching requires discrete terms, not prose. Full resume text would need NLP/embedding to be useful — overkill for a heuristic that contributes 40% of the blended score.
+- Keywords are predictable and testable: `"Python" in title` is deterministic.
+
+For the LLM layer:
+- The LLM already receives the full `description_snippet` (up to ~1K tokens) plus structured profile context (seniority, target roles, workplace preference). It has enough signal to evaluate fit.
+- Full resume text would add 2–5K tokens **per candidate** — at 10–50 candidates per run, this is a significant cost and latency increase for marginal accuracy gain.
+- Structured data (skills list + seniority + target roles) gives the LLM a cleaner signal than raw prose. Less noise → more focused evaluation.
+
+**Trade-offs acknowledged:**
+- Information loss during keyword extraction (mitigated by the LLM's contextual inference from structured profile fields).
+- No semantic matching in the rule-based layer (e.g., "TypeScript" won't boost a "Node.js" title). This is acceptable because the LLM layer handles semantic matching when enabled.
+
+**Verdict:** Current design is sound. The dual-layer approach lets each scorer operate at its optimal abstraction level — keywords for fast heuristics, structured profile for LLM evaluation. The 0.4/0.6 blending ensures the LLM's semantic understanding dominates while the rule-based layer provides a stable baseline.
