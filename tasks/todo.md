@@ -291,8 +291,10 @@ Quota: BLOCKED on second invocation (2/2 searches today)
 
 ## Backlog (Post-MVP)
 
+- [ ] Review the cost by execution
 - [ ] Review llm services accounts and keys
 - [ ] Benchmark LLM providers (Gemini Flash vs Opus) on real DB data — use `scripts/benchmark_llm_scoring.py`
+- [ ] **Capture LinkedIn "Requirements added by the job poster" section for visa filtering** — see `docs/research/requirements-section-discovery.md` for full context. The section with visa/work-auth phrases lives outside `#job-details` and is NOT loaded in the search side panel. Needs either full-page navigation or an alternative strategy. Branch: `feat/requirements-section-visa-filter`
 - [ ] Email/notification when N new candidates found (M11)
 - [ ] Web UI for reviewing candidates (M12)
 - [ ] Export to Notion or Airtable (M13)
