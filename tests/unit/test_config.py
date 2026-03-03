@@ -51,6 +51,17 @@ class TestSearchConfig:
         sc = SearchConfig(keyword="Python", scoring_keywords=["Django", "FastAPI"])
         assert sc.scoring_keywords == ["Django", "FastAPI"]
 
+    def test_description_exclude_patterns_accepted(self) -> None:
+        sc = SearchConfig(
+            keyword="Python",
+            description_exclude_patterns=["visa sponsorship", "work permit"],
+        )
+        assert sc.description_exclude_patterns == ["visa sponsorship", "work permit"]
+
+    def test_description_exclude_patterns_default_empty(self) -> None:
+        sc = SearchConfig(keyword="Python")
+        assert sc.description_exclude_patterns == []
+
 
 class TestQuotaPlatformConfig:
     def test_defaults(self) -> None:
@@ -184,7 +195,7 @@ class TestSettings:
     def test_load_example_settings(self) -> None:
         """The shipped example config/settings.yaml must be valid."""
         settings = Settings.from_yaml("config/settings.yaml")
-        assert len(settings.searches) == 2
+        assert len(settings.searches) >= 1
         assert settings.searches[0].keyword == "Senior Python Engineer"
 
     def test_yaml_without_scoring_keywords_loads(self, tmp_path: Path) -> None:

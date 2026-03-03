@@ -1,10 +1,11 @@
 """Filter chain for candidate matching.
 
 Filter order (L9):
-  1. ExcludeKeywordsFilter  — fast, title-only, case-insensitive
-  2. PositiveKeywordsFilter — optional, title OR snippet
-  3. DeduplicationFilter    — in-memory within run, by (platform, external_id)
-  4. AlreadySeenFilter      — DB lookup, persistent cross-run, TTL-aware
+  1. ExcludeKeywordsFilter      — fast, title-only, case-insensitive
+  2. PositiveKeywordsFilter     — optional, title OR snippet
+  3. DescriptionExcludeFilter   — description-only, phrase matching
+  4. DeduplicationFilter        — in-memory within run, by (platform, external_id)
+  5. AlreadySeenFilter          — DB lookup, persistent cross-run, TTL-aware
 """
 
 import logging
@@ -61,6 +62,28 @@ class PositiveKeywordsFilter:
     def _matches(self, candidate: JobCandidate) -> bool:
         text = f"{candidate.title} {candidate.description_snippet}".lower()
         return any(kw in text for kw in self._keywords)
+
+
+class DescriptionExcludeFilter:
+    """Remove candidates whose description contains any excluded phrase (case-insensitive)."""
+
+    def __init__(self, exclude_phrases: list[str]) -> None:
+        self._phrases = [p.lower().strip() for p in exclude_phrases if p.strip()]
+
+    def __call__(self, candidates: list[JobCandidate]) -> list[JobCandidate]:
+        if not self._phrases:
+            return candidates
+        result = [c for c in candidates if not self._description_matches(c)]
+        excluded = len(candidates) - len(result)
+        if excluded:
+            logger.debug("DescriptionExcludeFilter: removed %d candidates", excluded)
+        return result
+
+    def _description_matches(self, candidate: JobCandidate) -> bool:
+        desc = candidate.description_snippet.lower()
+        if not desc:
+            return False  # No description → pass through
+        return any(p in desc for p in self._phrases)
 
 
 class DeduplicationFilter:

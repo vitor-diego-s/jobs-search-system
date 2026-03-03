@@ -22,6 +22,7 @@ from src.pipeline.llm_scorer import score_candidates_llm
 from src.pipeline.matcher import (
     AlreadySeenFilter,
     DeduplicationFilter,
+    DescriptionExcludeFilter,
     ExcludeKeywordsFilter,
     Filter,
     PositiveKeywordsFilter,
@@ -214,6 +215,7 @@ def _build_filters(
     filters: list[Filter] = [
         ExcludeKeywordsFilter(config.exclude_keywords),
         PositiveKeywordsFilter(config.require_keywords),
+        DescriptionExcludeFilter(config.description_exclude_patterns),
         dedup_filter,
         AlreadySeenFilter(conn),
     ]

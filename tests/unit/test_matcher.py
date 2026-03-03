@@ -9,6 +9,7 @@ from src.core.schemas import JobCandidate, ScoredCandidate
 from src.pipeline.matcher import (
     AlreadySeenFilter,
     DeduplicationFilter,
+    DescriptionExcludeFilter,
     ExcludeKeywordsFilter,
     PositiveKeywordsFilter,
     run_filter_chain,
@@ -121,6 +122,61 @@ class TestPositiveKeywordsFilter:
         f = PositiveKeywordsFilter(["Rust"])
         candidates = [_candidate(title="Python Engineer")]
         assert len(f(candidates)) == 0
+
+
+# ---------------------------------------------------------------------------
+# DescriptionExcludeFilter
+# ---------------------------------------------------------------------------
+
+
+class TestDescriptionExcludeFilter:
+    def test_removes_visa_mention(self) -> None:
+        f = DescriptionExcludeFilter(["visa sponsorship"])
+        candidates = [
+            _candidate(external_id="1", description_snippet="Must have visa sponsorship to apply"),
+            _candidate(external_id="2", description_snippet="Great Python role, fully remote"),
+        ]
+        result = f(candidates)
+        assert len(result) == 1
+        assert result[0].external_id == "2"
+
+    def test_passes_clean_description(self) -> None:
+        f = DescriptionExcludeFilter(["visa sponsorship"])
+        candidates = [
+            _candidate(description_snippet="Build scalable Python microservices"),
+        ]
+        assert len(f(candidates)) == 1
+
+    def test_empty_description_passes(self) -> None:
+        f = DescriptionExcludeFilter(["visa sponsorship", "work authorization"])
+        candidates = [_candidate(description_snippet="")]
+        assert len(f(candidates)) == 1
+
+    def test_case_insensitive(self) -> None:
+        f = DescriptionExcludeFilter(["visa sponsorship"])
+        candidates = [
+            _candidate(description_snippet="VISA SPONSORSHIP is not provided"),
+        ]
+        assert len(f(candidates)) == 0
+
+    def test_empty_patterns_noop(self) -> None:
+        f = DescriptionExcludeFilter([])
+        candidates = [
+            _candidate(external_id="1", description_snippet="visa sponsorship"),
+            _candidate(external_id="2"),
+        ]
+        assert len(f(candidates)) == 2
+
+    def test_multiple_patterns(self) -> None:
+        f = DescriptionExcludeFilter(["visa sponsorship", "work permit", "right to work"])
+        candidates = [
+            _candidate(external_id="1", description_snippet="requires work permit"),
+            _candidate(external_id="2", description_snippet="must have right to work in US"),
+            _candidate(external_id="3", description_snippet="fully remote, async team"),
+        ]
+        result = f(candidates)
+        assert len(result) == 1
+        assert result[0].external_id == "3"
 
 
 # ---------------------------------------------------------------------------
