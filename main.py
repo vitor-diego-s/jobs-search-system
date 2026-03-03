@@ -5,6 +5,8 @@ import asyncio
 import logging
 import sys
 
+from dotenv import load_dotenv
+
 from src.browser.session import BrowserSession
 from src.core.config import Settings
 from src.core.db import init_db
@@ -201,6 +203,7 @@ def cmd_generate_config(args: argparse.Namespace) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
+    load_dotenv()
     args = parse_args(argv)
     setup_logging(args.verbose)
 
