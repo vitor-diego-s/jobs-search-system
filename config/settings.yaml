@@ -21,23 +21,235 @@ searches:
       max_pages: 3
     exclude_keywords:
       - Junior
+      - Frontend
+      - React
+      - Angular
       - PHP
       - Ruby
-      - Frontend
-      - "React Native"
+      - .NET
+      - iOS
+      - Android
+      - Java
+      - Spring
     require_keywords: []
-    fetch_description: false
+    scoring_keywords:
+      - Python
+      - Kubernetes
+      - Machine Learning
+      - TensorFlow
+      - Docker
+      - PostgreSQL
+      - AWS
+      - GCP
+      - FastAPI
+      - REST
+      - Airflow
+      - MLflow
+      - Helm
+      - Langchain
+      - RAG
+      - Computer Vision
+    description_exclude_patterns:
+      - "visa sponsorship"
+      - "work authorization"
+      - "authorized to work"
+      - "right to work"
+      - "work permit"
+      - "legally authorized"
+      - "eligible to work"
+    fetch_description: true
 
-  - keyword: "Staff Backend Engineer Python"
+  - keyword: "Senior Machine Learning Engineer"
     platform: linkedin
     filters:
       geo_id: 92000000
       workplace_type: [remote]
+      experience_level: [senior, director]
       easy_apply_only: true
-      max_pages: 2
+      max_pages: 3
     exclude_keywords:
       - Junior
       - Frontend
+      - React
+      - Angular
+      - PHP
+      - Ruby
+      - .NET
+      - iOS
+      - Android
+      - Java
+      - Spring
+    require_keywords: []
+    scoring_keywords:
+      - Python
+      - Kubernetes
+      - Machine Learning
+      - TensorFlow
+      - Docker
+      - PostgreSQL
+      - AWS
+      - GCP
+      - FastAPI
+      - REST
+      - Airflow
+      - MLflow
+      - Helm
+      - Langchain
+      - RAG
+      - Computer Vision
+    description_exclude_patterns:
+      - "visa sponsorship"
+      - "work authorization"
+      - "authorized to work"
+      - "right to work"
+      - "work permit"
+      - "legally authorized"
+      - "eligible to work"
+    fetch_description: true
+
+  - keyword: "Senior Backend Engineer Python"
+    platform: linkedin
+    filters:
+      geo_id: 92000000
+      workplace_type: [remote]
+      experience_level: [senior, director]
+      easy_apply_only: true
+      max_pages: 3
+    exclude_keywords:
+      - Junior
+      - Frontend
+      - React
+      - Angular
+      - PHP
+      - Ruby
+      - .NET
+      - iOS
+      - Android
+      - Java
+      - Spring
+    require_keywords: []
+    scoring_keywords:
+      - Python
+      - Kubernetes
+      - Machine Learning
+      - TensorFlow
+      - Docker
+      - PostgreSQL
+      - AWS
+      - GCP
+      - FastAPI
+      - REST
+      - Airflow
+      - MLflow
+      - Helm
+      - Langchain
+      - RAG
+      - Computer Vision
+    description_exclude_patterns:
+      - "visa sponsorship"
+      - "work authorization"
+      - "authorized to work"
+      - "right to work"
+      - "work permit"
+      - "legally authorized"
+      - "eligible to work"
+    fetch_description: true
+
+  - keyword: "Staff Software Engineer"
+    platform: linkedin
+    filters:
+      geo_id: 92000000
+      workplace_type: [remote]
+      experience_level: [senior, director]
+      easy_apply_only: true
+      max_pages: 3
+    exclude_keywords:
+      - Junior
+      - Frontend
+      - React
+      - Angular
+      - PHP
+      - Ruby
+      - .NET
+      - iOS
+      - Android
+      - Java
+      - Spring
+    require_keywords: []
+    scoring_keywords:
+      - Python
+      - Kubernetes
+      - Machine Learning
+      - TensorFlow
+      - Docker
+      - PostgreSQL
+      - AWS
+      - GCP
+      - FastAPI
+      - REST
+      - Airflow
+      - MLflow
+      - Helm
+      - Langchain
+      - RAG
+      - Computer Vision
+    description_exclude_patterns:
+      - "visa sponsorship"
+      - "work authorization"
+      - "authorized to work"
+      - "right to work"
+      - "work permit"
+      - "legally authorized"
+      - "eligible to work"
+    fetch_description: true
+
+  - keyword: "MLOps Engineer"
+    platform: linkedin
+    filters:
+      geo_id: 92000000
+      workplace_type: [remote]
+      experience_level: [senior, director]
+      easy_apply_only: true
+      max_pages: 3
+    exclude_keywords:
+      - Junior
+      - Frontend
+      - React
+      - Angular
+      - PHP
+      - Ruby
+      - .NET
+      - iOS
+      - Android
+      - Java
+      - Spring
+    require_keywords: []
+    scoring_keywords:
+      - Python
+      - Kubernetes
+      - Machine Learning
+      - TensorFlow
+      - Docker
+      - PostgreSQL
+      - AWS
+      - GCP
+      - FastAPI
+      - REST
+      - Airflow
+      - MLflow
+      - Helm
+      - Langchain
+      - RAG
+      - Computer Vision
+    description_exclude_patterns:
+      - "visa sponsorship"
+      - "work authorization"
+      - "authorized to work"
+      - "right to work"
+      - "work permit"
+      - "legally authorized"
+      - "eligible to work"
+    fetch_description: true
 
 scoring:
   title_match_bonus: 20
@@ -46,7 +258,7 @@ scoring:
   remote_bonus: 10
   recency_weight: 0.3
   # LLM scoring (M10) — set llm_enabled: true to activate
-  llm_enabled: false
+  llm_enabled: true
   llm_provider: gemini        # gemini | anthropic | openai | ollama
   llm_model: null             # null = provider default (gemini-2.5-flash)
   rule_weight: 0.4

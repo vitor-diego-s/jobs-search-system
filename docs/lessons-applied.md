@@ -292,6 +292,33 @@ These were broken in the previous project and must be fixed here:
 
 ---
 
+## L18. Config Integrity — Validate Before Every Pipeline Run
+
+**Source:** Frozen scorer investigation (2026-03-02)
+**Root cause:** 178 candidates clustered into exactly two score buckets (35.0 and 20.0). Multiple config/data integrity issues compounded:
+
+1. `scoring_keywords` was missing from `settings.yaml` — profile.yaml had 16 keywords but settings.yaml was hand-edited without them. Title match bonuses were always 0.
+2. `posted_time` stored as ISO dates (`"2026-03-02"`) instead of human-readable text (`"3 days ago"`) — parser read `datetime` attribute before `text_content()`, so recency bonus was always 0.
+3. `description_snippet` was empty on all 178 rows — ingested before `fetch_description: true` was wired. LLM scorer skipped every candidate.
+4. `easy_apply` and `remote` bonuses added no differentiation because filters guaranteed them for all candidates.
+
+**Rules:**
+1. **Never hand-edit `settings.yaml` for fields derived from `profile.yaml`** — always run `generate-config` after profile changes, then layer M10/custom settings on top.
+2. **After `generate-config`, always validate** the output loads (`Settings.from_yaml()`) and key fields are populated (`scoring_keywords`, `fetch_description`, `profile_path`, LLM settings).
+3. **Stale DB data is poison** — when parser logic or config changes materially affect stored fields (`posted_time` format, `description_snippet` presence), delete the DB and re-ingest. Don't score stale rows with new logic.
+4. **Bonuses that apply to 100% of candidates add no differentiation** — consider whether a scoring signal actually varies across the candidate pool. Uniform signals are wasted weight.
+
+**Config validation checklist (pre-run):**
+- [ ] `scoring_keywords` count matches profile (currently 16)
+- [ ] `fetch_description: true` on all searches
+- [ ] `llm_enabled`, `llm_provider`, `rule_weight`, `llm_weight` present under `scoring`
+- [ ] `profile_path` points to valid file
+- [ ] No stale rows in DB with empty `description_snippet` or ISO `posted_time`
+
+**Applied in:** Manual workflow discipline + future pre-flight check in orchestrator.
+
+---
+
 ## L15. Lessons NOT Applied (Apply-Phase Only)
 
 The following lessons from the previous project are explicitly out of scope for this search-only system:
