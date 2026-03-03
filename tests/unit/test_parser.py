@@ -116,7 +116,7 @@ class TestLinkedInParserParseCard:
         assert result.title == "Senior Python Engineer"
         assert result.company == "Acme Corp"
         assert result.location == "Remote — Worldwide"
-        assert result.posted_time == "2026-02-20"
+        assert result.posted_time == "3 days ago"
 
     async def test_title_from_strong_element(self, parser: LinkedInParser) -> None:
         """Title extracted from <strong> element (clean, no duplication)."""
@@ -252,8 +252,22 @@ class TestLinkedInParserParseCard:
         assert result is not None
         assert result.external_id == "222222"
 
-    async def test_posted_time_falls_back_to_text(self, parser: LinkedInParser) -> None:
-        """When time element has no datetime attr, use text_content."""
+    async def test_posted_time_prefers_text_over_datetime(self, parser: LinkedInParser) -> None:
+        """When both text and datetime are present, prefer text."""
+        card = _make_mock_card(posted_time="2026-02-20", posted_text="3 days ago")
+        result = await parser.parse_card(card)
+        assert result is not None
+        assert result.posted_time == "3 days ago"
+
+    async def test_posted_time_falls_back_to_datetime(self, parser: LinkedInParser) -> None:
+        """When text is empty, fall back to datetime attribute."""
+        card = _make_mock_card(posted_time="2026-02-20", posted_text="")
+        result = await parser.parse_card(card)
+        assert result is not None
+        assert result.posted_time == "2026-02-20"
+
+    async def test_posted_time_no_datetime_uses_text(self, parser: LinkedInParser) -> None:
+        """When datetime attr is absent, use text_content."""
         card = _make_mock_card(posted_time=None, posted_text="1 week ago")
         result = await parser.parse_card(card)
         assert result is not None

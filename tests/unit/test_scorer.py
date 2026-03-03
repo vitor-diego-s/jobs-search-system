@@ -2,7 +2,7 @@
 
 from src.core.config import ScoringConfig
 from src.core.schemas import JobCandidate
-from src.pipeline.scorer import score_candidate, score_candidates
+from src.pipeline.scorer import _estimate_days_ago, score_candidate, score_candidates
 
 
 def _candidate(
@@ -232,3 +232,44 @@ class TestScoringKeywords:
             scoring_keywords=None,
         )
         assert result.score >= 20.0
+
+
+# ---------------------------------------------------------------------------
+# ISO date fallback in _estimate_days_ago
+# ---------------------------------------------------------------------------
+
+
+class TestEstimateDaysAgoISODate:
+    def test_iso_date_today(self) -> None:
+        from datetime import date
+
+        today = date.today().isoformat()
+        result = _estimate_days_ago(today)
+        assert result == 0.0
+
+    def test_iso_date_past(self) -> None:
+        from datetime import date, timedelta
+
+        five_days_ago = (date.today() - timedelta(days=5)).isoformat()
+        result = _estimate_days_ago(five_days_ago)
+        assert result == 5.0
+
+    def test_iso_date_scores_recency(self) -> None:
+        """ISO date fed through scorer produces non-zero recency bonus."""
+        from datetime import date, timedelta
+
+        recent = (date.today() - timedelta(days=1)).isoformat()
+        config = _config(recency_weight=1.0, seniority_match_bonus=0.0)
+        result = score_candidate(_candidate(posted_time=recent), config)
+        assert result.score > 0.0
+
+    def test_invalid_iso_date_returns_none(self) -> None:
+        assert _estimate_days_ago("not-a-date") is None
+
+    def test_partial_iso_date_returns_none(self) -> None:
+        assert _estimate_days_ago("2026") is None
+
+    def test_text_pattern_still_preferred(self) -> None:
+        """Text patterns take priority over ISO fallback."""
+        result = _estimate_days_ago("3 days ago")
+        assert result == 3.0

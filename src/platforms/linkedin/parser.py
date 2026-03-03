@@ -167,17 +167,17 @@ class LinkedInParser:
             return ""
 
     async def _parse_posted_time(self, card: ElementLike) -> str:
-        """Extract posted time, preferring datetime attribute on <time> elements."""
+        """Extract posted time, preferring human-readable text for scorer compatibility."""
         try:
             el = await self._find_first(card, POSTED_TIME_SELECTORS)
             if el is None:
                 return ""
-            # <time> elements often have a datetime attribute
-            dt_attr = await el.get_attribute("datetime")
-            if dt_attr and dt_attr.strip():
-                return dt_attr.strip()
+            # Prefer human-readable text ("3 days ago") for scorer compatibility
             text = await el.text_content()
-            return text.strip() if text else ""
+            if text and text.strip():
+                return text.strip()
+            dt_attr = await el.get_attribute("datetime")
+            return dt_attr.strip() if dt_attr and dt_attr.strip() else ""
         except Exception:
             logger.debug("Error parsing posted_time", exc_info=True)
             return ""

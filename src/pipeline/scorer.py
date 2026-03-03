@@ -113,4 +113,12 @@ def _estimate_days_ago(posted_time: str) -> float | None:
         if match:
             value = float(match.group(1))
             return value * multiplier
-    return None
+    # Fallback: try ISO date (YYYY-MM-DD)
+    try:
+        from datetime import date
+
+        posted_date = date.fromisoformat(posted_time[:10])
+        delta = (date.today() - posted_date).days
+        return max(0.0, float(delta))
+    except (ValueError, TypeError):
+        return None
