@@ -189,6 +189,7 @@ def export_results_json(results: list[SearchResult]) -> str:
                 "score": s.score,
                 "llm_score": s.llm_score,
                 "llm_reasoning": s.llm_reasoning,
+                "llm_model": s.llm_model,
             })
     return json.dumps(data, indent=2)
 

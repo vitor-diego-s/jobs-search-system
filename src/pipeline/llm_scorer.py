@@ -116,6 +116,8 @@ def score_candidate_llm(
     if not candidate.description_snippet:
         return scored
 
+    resolved_model = config.llm_model or provider.default_model
+
     try:
         prompt = _build_user_prompt(candidate, profile)
         raw = provider.complete(
@@ -137,6 +139,7 @@ def score_candidate_llm(
         score=blended,
         llm_score=llm_score,
         llm_reasoning=reasoning,
+        llm_model=resolved_model,
     )
 
 

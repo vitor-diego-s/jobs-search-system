@@ -45,6 +45,10 @@ class TestInitDb:
         assert "quota" in tables
         assert "search_runs" in tables
 
+    def test_llm_model_column_exists(self, db) -> None:  # type: ignore[no-untyped-def]
+        cols = [row[1] for row in db.execute("PRAGMA table_info(candidates)").fetchall()]
+        assert "llm_model" in cols
+
     def test_idempotent(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
         """Calling init_db twice on the same path doesn't error."""
         p = tmp_path / "double.db"
@@ -75,6 +79,24 @@ class TestUpsertCandidate:
         assert upsert_candidate(db, _scored("1", platform="glassdoor")) is True
         count = db.execute("SELECT COUNT(*) FROM candidates").fetchone()[0]
         assert count == 2
+
+    def test_llm_model_persisted(self, db) -> None:  # type: ignore[no-untyped-def]
+        sc = ScoredCandidate(
+            candidate=JobCandidate(
+                external_id="model-1",
+                platform="linkedin",
+                title="Dev",
+                url="https://example.com/model-1",
+            ),
+            score=70.0,
+            llm_score=85.0,
+            llm_model="gemini-2.0-flash",
+        )
+        upsert_candidate(db, sc)
+        row = db.execute(
+            "SELECT llm_model FROM candidates WHERE external_id = 'model-1'"
+        ).fetchone()
+        assert row["llm_model"] == "gemini-2.0-flash"
 
     def test_score_stored(self, db) -> None:  # type: ignore[no-untyped-def]
         sc = ScoredCandidate(

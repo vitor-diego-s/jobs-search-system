@@ -78,6 +78,7 @@ def init_db(path: str | Path) -> sqlite3.Connection:
     # M10 schema evolution — safe to run on existing DBs
     _add_column_if_missing(conn, "candidates", "llm_score", "REAL")
     _add_column_if_missing(conn, "candidates", "llm_reasoning", "TEXT NOT NULL DEFAULT ''")
+    _add_column_if_missing(conn, "candidates", "llm_model", "TEXT NOT NULL DEFAULT ''")
     conn.commit()
     return conn
 
@@ -94,8 +95,8 @@ def upsert_candidate(conn: sqlite3.Connection, scored: ScoredCandidate) -> bool:
             INSERT INTO candidates
                 (external_id, platform, title, company, location, url,
                  is_easy_apply, workplace_type, posted_time, description_snippet,
-                 score, llm_score, llm_reasoning, found_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 score, llm_score, llm_reasoning, llm_model, found_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 c.external_id,
@@ -111,6 +112,7 @@ def upsert_candidate(conn: sqlite3.Connection, scored: ScoredCandidate) -> bool:
                 scored.score,
                 scored.llm_score,
                 scored.llm_reasoning,
+                scored.llm_model,
                 c.found_at.isoformat(),
             ),
         )

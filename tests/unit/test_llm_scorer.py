@@ -66,9 +66,10 @@ def _make_config(**overrides: object) -> ScoringConfig:
     return ScoringConfig(**defaults)  # type: ignore[arg-type]
 
 
-def _mock_provider(response: str) -> MagicMock:
+def _mock_provider(response: str, default_model: str = "mock-model-v1") -> MagicMock:
     provider = MagicMock()
     provider.complete.return_value = response
+    provider.default_model = default_model
     return provider
 
 
@@ -183,6 +184,7 @@ class TestScoreCandidateLlm:
         assert result.score == 68.0
         assert result.llm_score == 80.0
         assert result.llm_reasoning == "Great fit"
+        assert result.llm_model == "mock-model-v1"
 
     def test_skips_empty_description(self) -> None:
         scored = _make_scored(description_snippet="")
@@ -192,11 +194,13 @@ class TestScoreCandidateLlm:
         result = score_candidate_llm(scored, _make_profile(), config, provider)
 
         assert result is scored  # unchanged
+        assert result.llm_model == ""
         provider.complete.assert_not_called()
 
     def test_llm_api_failure_fallback(self) -> None:
         scored = _make_scored(score=42.0)
         provider = MagicMock()
+        provider.default_model = "mock-model-v1"
         provider.complete.side_effect = RuntimeError("API down")
         config = _make_config()
 
@@ -205,6 +209,7 @@ class TestScoreCandidateLlm:
         assert result is scored  # original returned
         assert result.score == 42.0
         assert result.llm_score is None
+        assert result.llm_model == ""
 
     def test_parse_failure_fallback(self) -> None:
         scored = _make_scored(score=30.0)
@@ -225,7 +230,17 @@ class TestScoreCandidateLlm:
 
         assert result.llm_score == 90.0
         assert result.llm_reasoning == "Perfect match"
+        assert result.llm_model == "mock-model-v1"
         assert result.score == round(0.4 * 60 + 0.6 * 90, 2)
+
+    def test_explicit_model_override(self) -> None:
+        scored = _make_scored(score=50.0)
+        provider = _mock_provider('{"score": 70, "reasoning": "ok"}')
+        config = _make_config(llm_model="custom-model-2")
+
+        result = score_candidate_llm(scored, _make_profile(), config, provider)
+
+        assert result.llm_model == "custom-model-2"
 
     def test_passes_custom_system_prompt_to_provider(self) -> None:
         scored = _make_scored()
@@ -263,6 +278,7 @@ class TestScoreCandidatesLlm:
             '{"score": 100, "reasoning": "perfect for job-2"}',
         ])
         provider = MagicMock()
+        provider.default_model = "mock-model-v1"
         provider.complete.side_effect = lambda *a, **kw: next(responses)
         config = _make_config(rule_weight=0.4, llm_weight=0.6)
 
@@ -305,6 +321,7 @@ class TestScoreCandidatesLlm:
             return '{"score": 80, "reasoning": "good"}'
 
         provider = MagicMock()
+        provider.default_model = "mock-model-v1"
         provider.complete.side_effect = side_effect
         config = _make_config()
 

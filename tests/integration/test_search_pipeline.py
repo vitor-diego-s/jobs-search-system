@@ -328,6 +328,7 @@ class TestExportJson:
             score=68.0,
             llm_score=80.0,
             llm_reasoning="Strong match",
+            llm_model="gemini-2.0-flash",
         )]
         result = SearchResult(
             keyword="test",
@@ -341,6 +342,7 @@ class TestExportJson:
         data = json.loads(output)
         assert data[0]["llm_score"] == 80.0
         assert data[0]["llm_reasoning"] == "Strong match"
+        assert data[0]["llm_model"] == "gemini-2.0-flash"
 
     def test_export_llm_fields_null_when_not_scored(self) -> None:
         from src.core.schemas import ScoredCandidate
@@ -417,6 +419,7 @@ class TestLlmScoringPipeline:
         )
 
         mock_provider = MagicMock()
+        mock_provider.default_model = "mock-gemini"
         mock_provider.complete.return_value = '{"score": 90, "reasoning": "Perfect match"}'
 
         with patch("src.pipeline.llm_scorer.get_provider", return_value=mock_provider):
@@ -428,6 +431,7 @@ class TestLlmScoringPipeline:
         # rule_score would be computed from scorer, llm=90 → blended = 0.4*rule + 0.6*90
         assert scored[0].llm_score == 90.0
         assert scored[0].llm_reasoning == "Perfect match"
+        assert scored[0].llm_model == "mock-gemini"
         # Blended score should reflect LLM contribution
         assert scored[0].score > 0
 
@@ -463,15 +467,17 @@ class TestLlmScoringPipeline:
         )
 
         mock_provider = MagicMock()
+        mock_provider.default_model = "mock-gemini"
         mock_provider.complete.return_value = '{"score": 75, "reasoning": "Good fit"}'
 
         with patch("src.pipeline.llm_scorer.get_provider", return_value=mock_provider):
             await run_all_searches(settings, adapter, db)
 
         row = db.execute(
-            "SELECT llm_score, llm_reasoning FROM candidates WHERE external_id = ?",
+            "SELECT llm_score, llm_reasoning, llm_model FROM candidates WHERE external_id = ?",
             ("persist-1",),
         ).fetchone()
         assert row is not None
         assert row["llm_score"] == 75.0
         assert row["llm_reasoning"] == "Good fit"
+        assert row["llm_model"] == "mock-gemini"
